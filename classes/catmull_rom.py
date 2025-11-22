@@ -8,7 +8,7 @@ class CatmullRom():
         self.length = 0
 
     def setControlPoint(self, points):
-        self.control_point = points
+        self.control_point = [l[:2] for l in points]
 
     def getResult(self):
         return self.result_point, self.length, self.time

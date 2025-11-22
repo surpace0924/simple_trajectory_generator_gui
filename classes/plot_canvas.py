@@ -13,6 +13,27 @@ import matplotlib.patches as patches
 import numpy as np
 import colorsys
 
+# NHK
+# x_range = [-6.1, 6.1]
+# y_range = [-6.1, 4.1]
+
+# ABU
+x_range = [-3.5, 3.5]
+y_range = [-6.0, 2.0]
+
+def createRectangle(pose, width, height, ec='#000000', fc='#FFFFFF', fill=False):
+    point = []
+    point.append((width/2, +height/2))
+    point.append((-width/2, +height/2))
+    point.append((-width/2, -height/2))
+    point.append((+width/2, -height/2))
+
+    for i, p in enumerate(point):
+        x = pose[0]+(p[0]*np.cos(pose[2]) - p[1]*np.sin(pose[2]))
+        y = pose[1]+(p[0]*np.sin(pose[2]) + p[1]*np.cos(pose[2]))
+        point[i] = (x, y)
+
+    return plt.Polygon((point[0], point[1], point[2], point[3]), ec=ec, fc=fc, fill=fill)
 
 def resizeByRange(x, in_min, in_max, out_min, out_max):
     return (x - in_min) * (out_max - out_min) / (in_max - in_min) + out_min
@@ -65,13 +86,49 @@ class PlotCanvas(FigureCanvas):
         self.drawOrigin(self.origin)
 
     def plot(self):
-        # map画像の読み込み
-        self.img = mpimg.imread(self.map_path)
-        self.ax.imshow(self.img)
+        # フィールド構造物の描画
+        field = []
+        field.append(plt.Polygon(((+3.450, -5.950),
+                                  (+3.450, -4.000),
+                                  (-0.025, -4.000),
+                                  (-0.025, -3.950),
+                                  (+3.450, -3.950),
+                                  (+3.450, +1.950),
+                                  (-3.450, +1.950),
+                                  (-3.450, -3.950),
+                                  (-1.025, -3.950),
+                                  (-1.025, -4.000),
+                                  (-3.450, -4.000),
+                                  (-3.450, -5.950)),
+                                ec='#000000', fill=False))
+        # テーブル
+        field.append(createRectangle([0.0, 0.0, 0.0], 1.150, 0.330, fill=True))
+        field.append(createRectangle([0.0, -2.5, 0.0], 1.150, 0.330, fill=True))
+        field.append(patches.Circle(xy=(-2, 0.28), radius=0.46, ec='#000000', fill=False))
+        field.append(patches.Circle(xy=(-2, -0.28), radius=0.46, ec='#000000', fill=False))
+        field.append(createRectangle([-2.0, 0.0, 0.0], 1.0, 0.560, ec='#FFFFFF', fill=True))
+
+        for f in field:
+            self.ax.add_patch(f)
+
+        # スタートゾーン
+        self.ax.plot([3.45, 2.45], [-4.95, -4.95], "black", linewidth = 1)
+        self.ax.plot([2.45, 2.45], [-4.95, -5.95], "black", linewidth = 1)
+        self.ax.plot([-0.025, -0.025], [-4.000, -3.000], "black", linewidth = 1)
+        self.ax.plot([-1.025, -0.025], [-3.000, -3.000], "black", linewidth = 1)
+        self.ax.plot([-1.025, -1.025], [-3.000, -4.000], "black", linewidth = 1)
+        self.ax.plot([-1.025, -0.025], [-4.000, -4.000], "black", linewidth = 1)
+
+        # ラック
+        self.ax.plot([-2.45, -3.45], [-5.45, -5.45], "black", linewidth = 1)
+        self.ax.plot([-2.45, -2.45], [-5.45, -5.95], "black", linewidth = 1)
 
         # 軸を消す
         self.ax.set_xticks([])
         self.ax.set_yticks([])
+        self.ax.set_xlim(x_range)
+        self.ax.set_ylim(y_range)
+        self.ax.set_aspect('equal')
 
         # 描画
         self.draw()
@@ -85,19 +142,18 @@ class PlotCanvas(FigureCanvas):
 
         dot_px = []
         plot_x, plot_y = self.__convertToPlot(dot_px)
-        self.origin_point = self.ax.plot(self.origin[0], self.origin[1], marker='.', markersize=12, color="yellow", linestyle='None')
+        self.origin_point = self.ax.plot(0, 0, marker='.', markersize=12, color="yellow", linestyle='None')
         self.draw()
 
     # mapクリック時の処理
     def onclick(self, event):
-        # pxからmへ単位を変換し，制御点を管理するクラスへ書き込み
-        clicked_px = [event.xdata, event.ydata]
-        point = convertToMeter(clicked_px, self.scale, self.origin)
+        point = [event.xdata, event.ydata]
         point.append(0)# 角度はとりあえず0としておく
-        self.parent.via_point.append(point)
+        self.parent.via_points.append(point)
+        self.parent.via_speed.append(0)
 
         # tableをクリアし，座標の数だけ行を用意
-        items = self.parent.via_point
+        items = self.parent.via_points
         # self.parent.tableWidget.clearContents()
         self.parent.tableWidget.setRowCount(len(items))
 
@@ -109,6 +165,8 @@ class PlotCanvas(FigureCanvas):
             r, 1, QTableWidgetItem('{0:.3f}'.format(items[r][1])))
         self.parent.tableWidget.setItem(
             r, 2, QTableWidgetItem('{0:.3f}'.format(items[r][2])))
+        self.parent.tableWidget.setItem(
+            r, 3, QTableWidgetItem('{0:.3f}'.format(0)))
         # print()
 
 
@@ -117,11 +175,8 @@ class PlotCanvas(FigureCanvas):
         if self.control_point != None:
             self.control_point[0].remove()
 
-        dot_px = []
-        for i in range(len(point)):
-            dot_px.append(convertToPx(point[i], self.scale, self.origin))
-
-        plot_x, plot_y = self.__convertToPlot(dot_px)
+        plot_x = [l[0] for l in point]
+        plot_y = [l[1] for l in point]
         self.control_point = self.ax.plot(
             plot_x, plot_y, marker='.', markersize=12, color="green", linestyle='None')
         self.draw()
@@ -135,11 +190,8 @@ class PlotCanvas(FigureCanvas):
         if self.traj != None:
             self.traj.remove()
 
-        for i in range(len(dots)):
-            dot_px.append(convertToPx(dots[i], self.scale, self.origin))
-
-        # 描画用に座標リストを2つのベクトルに変換
-        plot_x, plot_y = self.__convertToPlot(dot_px)
+        plot_x = [l[0] for l in dots]
+        plot_y = [l[1] for l in dots]
 
         color_list = []
         max_speed = max(speed_profile)
@@ -163,6 +215,7 @@ class PlotCanvas(FigureCanvas):
             y.append(matrix[i][1])
         return x, y
 
+    # スクロールで拡大縮小するやつ
     def add_zoom_func(self, base_scale=1.5):
         def zoom_func(event):
             bbox = self.ax.get_window_extent()
@@ -198,9 +251,9 @@ class PlotCanvas(FigureCanvas):
             self.ax.set_xlim(xlim)
             self.ax.set_ylim(ylim)
 
-            if (abs(xlim[1] - xlim[0]) > self.img.shape[1]) and (abs(ylim[1] - ylim[0]) > self.img.shape[0]):
-                self.ax.set_xlim([0, self.img.shape[1]])
-                self.ax.set_ylim([self.img.shape[0], 0])
+            if (abs(xlim[1] - xlim[0]) > x_range[1] - x_range[0]) and (abs(ylim[1] - ylim[0]) > y_range[1] - y_range[0]):
+                self.ax.set_xlim(x_range)
+                self.ax.set_ylim(y_range)
 
             self.figure.canvas.draw()
         self.figure.canvas.mpl_connect('scroll_event', zoom_func)

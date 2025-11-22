@@ -25,7 +25,7 @@ class GraphViewer():
         # plt.ylim(0.0, 0.7)
 
         # 余白設定
-        plt.subplots_adjust(left=0.11, right=0.78, bottom=0.11, top=0.95)
+        plt.subplots_adjust(left=0.11, right=0.95, bottom=0.13, top=0.95)
 
 
         # グラフの凡例
@@ -46,12 +46,24 @@ class GraphViewer():
         self.ax1.set_ylabel("Speed profile [m/s]")
         plt.show()
 
+    def displayAngularSpeedProfile(self, time_stamp, angular_speed_profile):
+        # self.ax1.plot(speed_profile, color=self.color_list[3], linewidth=1)
+        self.ax1.plot(time_stamp, angular_speed_profile, color=self.color_list[6], linewidth=1)
+        self.ax1.set_xlabel("Time [s]")
+        self.ax1.set_ylabel("Speed profile [rad/s]")
+        plt.show()
+
     def displayAccelerationProfile(self, time_stamp, acceleration_profile):
         self.ax1.plot(time_stamp, acceleration_profile, color=self.color_list[4], linewidth=1)
         self.ax1.set_xlabel("Time [s]")
         self.ax1.set_ylabel("Acceleration profile [m/s^2]")
         plt.show()
 
+    def displayAngleProfile(self, time_stamp, angle_profile):
+        self.ax1.plot(time_stamp, angle_profile, color=self.color_list[5], linewidth=1)
+        self.ax1.set_xlabel("Time [s]")
+        self.ax1.set_ylabel("angle profile [rad]")
+        plt.show()
 
     def displayAll(self, speed_profile, acceleration_profile, curvature):
         self.ax1.plot(speed_profile, color=self.color_list[2], linewidth=1)

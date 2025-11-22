@@ -1,9 +1,13 @@
 # -*- coding: utf-8 -*-
+"""経路計算モジュール
+
+このモジュールは、経由点と制約条件から最適な経路を計算します。
+"""
 import numpy as np
-import matplotlib.pyplot as plt
 from classes import catmull_rom
 from classes import speed_profile
 from classes import min_jerk_profile
+
 
 class TrajectoryCalculator():
     def __init__(self):
@@ -29,15 +33,12 @@ class TrajectoryCalculator():
         self.__acceleration_profile = []
         self.__trajectory_length_list = []
         self.__time_stamp = []
-        self.__time = 0
-
 
     def setDotGap(self, dot_gap):
         self.__dot_gap = dot_gap
 
     def setFrequency(self, frequency):
         self.__hz = frequency
-
 
     def setMaxLinearJerk(self, max_linear_jerk):
         self.__max_linear_jerk = max_linear_jerk
@@ -59,7 +60,6 @@ class TrajectoryCalculator():
 
     def setUseViaSpeed(self, use_via_speed):
         self.__use_via_speed = use_via_speed
-
 
     def getFrequency(self):
         return self.__hz
@@ -104,7 +104,7 @@ class TrajectoryCalculator():
     # 計算
     def calculate(self):
         cr = catmull_rom.CatmullRom()
-        cr.setControlPoint(self.__via_points)
+        cr.set_control_points(self.__via_points)
 
         # 経路の分割数を計算するために大まかな経路長を算出する
         about_length = 0
@@ -119,7 +119,6 @@ class TrajectoryCalculator():
 
         # 曲線の計算
         curve, curve_length_list, via_points_length = cr.calculate(div_num)
-        curve_length = curve_length_list[-1]
 
         section_length = [0]
         via_speed_list = []
@@ -140,14 +139,14 @@ class TrajectoryCalculator():
         for i in range(len(section_length)):
             t0 = sp.t_end()
             sp.reset(
-                j_max = self.__max_linear_jerk,
-                a_max = self.__max_linear_acceleration,
-                v_sat = self.__max_linear_speed,
-                v_start = sp.v_end(),
-                v_target = via_speed_list[i],
-                dist = section_length[i],
-                x_start = sp.x_end(),
-                t_start = sp.t_end())
+                j_max=self.__max_linear_jerk,
+                a_max=self.__max_linear_acceleration,
+                v_sat=self.__max_linear_speed,
+                v_start=sp.v_end(),
+                v_target=via_speed_list[i],
+                dist=section_length[i],
+                x_start=sp.x_end(),
+                t_start=sp.t_end())
 
             for j in range(int((sp.t_end() - t0) * self.__hz)):
                 t = j/self.__hz + t0
@@ -170,11 +169,10 @@ class TrajectoryCalculator():
         # 角度制約がある経由点を通過する時刻のリスト
         via_time_stamp = [0]
         via_angle = [self.__via_points[0][2]]
-        tmp_dist = 1000000
         for i, via in enumerate(self.__via_points):
-            if self.__use_via_angle[i] == False:
+            if not self.__use_via_angle[i]:
                 continue
-            if i == 0 or i == len(self.__via_points)-1:
+            if i in (0, len(self.__via_points) - 1):
                 continue
             time = self.getNearestTime(via)
             via_time_stamp.append(time)
@@ -199,9 +197,9 @@ class TrajectoryCalculator():
             # 角度計算
             dt = via_time_stamp[idx] - via_time_stamp[idx-1]
             mjp = min_jerk_profile.MinJerkProfile(
-                x_start = via_angle[i-1],
-                x_target = via_angle[i],
-                time = dt)
+                x_start=via_angle[i-1],
+                x_target=via_angle[i],
+                time=dt)
             angles = np.append(angles, mjp.x(t - via_time_stamp[idx-1]))
             self.__angular_speed_profile = np.append(
                 self.__angular_speed_profile,
@@ -215,37 +213,37 @@ class TrajectoryCalculator():
         for i, curvature in zip(range(len(self.__curvature)), self.__curvature):
             self.__curvature[i] = abs(curvature)
 
-
     # プロファイルにしたがって，一番近い座標を選択
+
     def __pickupTrajectory(self, curve, length_list, profile):
         trajectory = []
         trajectory_length_list = []
         for item in profile:
-            length, idx = self.__getNearestValue(length_list, item)
+            _, idx = self.__getNearestValue(length_list, item)
             trajectory.append(curve[idx])
             trajectory_length_list.append(length_list[idx])
         return trajectory, trajectory_length_list
 
-
     # リストからある値に最も近い値を返却する関数
-    # @param list: データ配列
+    # @param data_list: データ配列
     # @param num: 対象値
     # @return 対象値に最も近い値
-    def __getNearestValue(self, list, num):
-        # リスト要素と対象値の差分を計算し最小値のインデックスを取得
-        idx = np.abs(np.asarray(list) - num).argmin()
-        return list[idx], idx
 
+    def __getNearestValue(self, data_list, num):
+        # リスト要素と対象値の差分を計算し最小値のインデックスを取得
+        idx = np.abs(np.asarray(data_list) - num).argmin()
+        return data_list[idx], idx
 
     # 曲率計算
     # @param curve: 曲線の座標リスト
     # @return 曲率リスト
+
     def __calculateCurvature(self, curve):
         curvatures = [0.0]
         for i in np.arange(1, len(curve)-1):
-            dxn = curve[i][0]     - curve[i - 1][0]
+            dxn = curve[i][0] - curve[i - 1][0]
             dxp = curve[i + 1][0] - curve[i][0]
-            dyn = curve[i][1]     - curve[i - 1][1]
+            dyn = curve[i][1] - curve[i - 1][1]
             dyp = curve[i + 1][1] - curve[i][1]
             dn = np.hypot(dxn, dyn)
             dp = np.hypot(dxp, dyp)

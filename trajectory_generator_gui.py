@@ -248,26 +248,6 @@ class TrajectoryGeneratorGui(QMainWindow, Ui_MainWindow):
         self._redraw()
 
     @pyqtSlot()
-    def button_deg2rad(self) -> None:
-        """角度を度からラジアンに変換"""
-        try:
-            deg = float(self.lineEdit_10.text())
-            rad = deg * np.pi / 180.0
-            self.lineEdit_11.setText(f'{rad:.5f}')
-        except ValueError:
-            self._print_log("[Error] 角度の入力値が不正です")
-
-    @pyqtSlot()
-    def button_rad2deg(self) -> None:
-        """角度をラジアンから度に変換"""
-        try:
-            rad = float(self.lineEdit_11.text())
-            deg = rad / np.pi * 180.0
-            self.lineEdit_10.setText(f'{deg:.5f}')
-        except ValueError:
-            self._print_log("[Error] 角度の入力値が不正です")
-
-    @pyqtSlot()
     def button_cell_delete_Click(self) -> None:
         """選択された経由点を削除"""
         # 削除する行の特定
@@ -329,13 +309,33 @@ class TrajectoryGeneratorGui(QMainWindow, Ui_MainWindow):
 
             for r, item in enumerate(items):
                 for c in range(len(item)):
-                    self.tableWidget.setItem(r, c, QTableWidgetItem(item[c]))
+                    value = item[c]
+                    # 角度列(c=2)の場合、既存JSONとの互換性のため自動判定
+                    if c == COLUMN_INDEX_ANGLE and value:
+                        try:
+                            value_num = float(value)
+                            # -π〜πの範囲ならラジアンと判定して度に変換
+                            # それ以外は既に度と判定してそのまま使用
+                            if -np.pi <= value_num <= np.pi and abs(value_num) < 10:
+                                # ラジアン値として度に変換
+                                value = f"{np.rad2deg(value_num):.3f}"
+                            else:
+                                # 既に度の値としてそのまま使用
+                                value = str(value)
+                        except (ValueError, TypeError):
+                            pass  # 変換失敗時はそのまま使用
+                    self.tableWidget.setItem(r, c, QTableWidgetItem(str(value)))
 
         self._redraw()
 
     @pyqtSlot()
     def button_export_settingfile(self) -> None:
-        """現在の設定をJSONファイルにエクスポート"""
+        """現在の設定をJSONファイルにエクスポート
+
+        Note:
+            テーブルの角度は度(deg)のまま保存されます。
+            読み込み時に再度度として表示されます。
+        """
         # 制約条件などをパラメータ辞書に保存
         self.app_param['max_linear_jerk'] = self.lineEdit_01.text()
         self.app_param['max_linear_acceleration'] = self.lineEdit_02.text()
@@ -347,7 +347,7 @@ class TrajectoryGeneratorGui(QMainWindow, Ui_MainWindow):
         self.app_param['disp_period'] = self.lineEdit_04.text()
         self.app_param['robot'] = self.comboBox.currentText()
 
-        # Tableデータの取得
+        # Tableデータの取得（角度は度のまま保存）
         table_val = []
         for row in range(self.tableWidget.rowCount()):
             row_data = []
@@ -499,6 +499,9 @@ class TrajectoryGeneratorGui(QMainWindow, Ui_MainWindow):
 
         テーブルの各行から座標、角度、速度を読み取り、
         内部の経由点リストを更新します。空欄の場合は制約なしとして扱います。
+
+        Note:
+            テーブルの角度入力は度(deg)で、内部的にラジアン(rad)に変換されます。
         """
         row_num = self.tableWidget.rowCount()
         self.use_via_angle = [True] * row_num
@@ -520,6 +523,11 @@ class TrajectoryGeneratorGui(QMainWindow, Ui_MainWindow):
 
                 try:
                     item_float = float(item_str)
+
+                    # 角度列の場合は度からラジアンに変換
+                    if column == COLUMN_INDEX_ANGLE:
+                        item_float = np.deg2rad(item_float)
+
                 except ValueError:
                     # 空欄判定
                     if column == COLUMN_INDEX_ANGLE:

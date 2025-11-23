@@ -93,7 +93,10 @@ class ViaPoint:
             raise ValueError(f"位置座標は最低2次元必要です: {self.position}")
 
         if self.angle is not None and not (-np.pi <= self.angle <= np.pi):
-            raise ValueError(f"角度は-πからπの範囲である必要があります: {self.angle}")
+            raise ValueError(
+                f"角度は-π〜πラジアン(-180°〜180°)の範囲である必要があります: "
+                f"{self.angle} rad ({np.rad2deg(self.angle):.1f}°)"
+            )
 
         if self.speed is not None and self.speed < 0:
             raise ValueError(f"速度は非負の値である必要があります: {self.speed}")

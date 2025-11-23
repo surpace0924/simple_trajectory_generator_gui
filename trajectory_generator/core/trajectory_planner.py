@@ -258,15 +258,17 @@ class TrajectoryPlanner:
         last_angle = via_points[-1].angle if via_points[-1].angle is not None else 0.0
         angle_via_values.append(last_angle)
 
-        # 角度制約間の距離（角度差）を計算
+        # 角度制約間の距離（角度差）を計算（最短経路）
         angle_sections = []
         for i in range(len(angle_via_values) - 1):
             angle_diff = angle_via_values[i + 1] - angle_via_values[i]
+            # 角度差を-π〜πの範囲に正規化（最短経路を選択）
+            angle_diff = np.arctan2(np.sin(angle_diff), np.cos(angle_diff))
             angle_sections.append(angle_diff)
 
         # SpeedProfileで角度プロファイルを生成
         angle_timestamps = []
-        angles_list = []
+        angles_list_cumulative = []  # 累積角度（アンラップ状態）
         angular_velocities_list = []
 
         # 角速度制約（角度用の制約を設定）
@@ -275,6 +277,9 @@ class TrajectoryPlanner:
         max_angular_accel = self.config.max_linear_acceleration  # [rad/s²]
         max_angular_speed = self.config.max_linear_speed  # [rad/s]
 
+        # 累積角度の初期値（開始角度）
+        cumulative_angle = angle_via_values[0]
+
         sp_angle = SpeedProfile()
 
         for i, angle_section in enumerate(angle_sections):
@@ -282,6 +287,9 @@ class TrajectoryPlanner:
             section_start_time = angle_via_times[i]
             section_end_time = angle_via_times[i + 1]
             section_duration = section_end_time - section_start_time
+
+            # この区間の開始累積角度を記録
+            section_start_angle = cumulative_angle
 
             t0 = sp_angle.t_end()
             sp_angle.reset(
@@ -309,24 +317,47 @@ class TrajectoryPlanner:
                 time_ratio = (actual_t - section_start_time) / section_duration
                 sp_t = t0 + time_ratio * sp_duration
 
+                # この区間内の相対角度変化を取得
+                relative_angle = sp_angle.x(sp_t) - sp_angle.x(t0)
+
                 angle_timestamps.append(actual_t)
-                angles_list.append(sp_angle.x(sp_t))
+                # 累積角度 = 区間開始角度 + 区間内の変化
+                angles_list_cumulative.append(section_start_angle + relative_angle)
 
                 # 角速度も時間スケーリングに応じて調整
                 # v_actual = v_sp * (sp_duration / section_duration)
                 angular_velocities_list.append(sp_angle.v(sp_t) * (sp_duration / section_duration))
 
+            # 次の区間のために累積角度を更新
+            cumulative_angle = section_start_angle + angle_section
+
         # 終点を追加
         angle_timestamps.append(end_time)
-        angles_list.append(sp_angle.x(sp_angle.t_end()))
+        angles_list_cumulative.append(cumulative_angle)
         angular_velocities_list.append(0.0)  # 終点では角速度ゼロ
 
         # 元のタイムスタンプに合わせて補間
-        angles = np.interp(timestamps, angle_timestamps, angles_list)
+        angles_cumulative = np.interp(timestamps, angle_timestamps, angles_list_cumulative)
         angular_velocities = np.interp(timestamps, angle_timestamps, angular_velocities_list)
 
-        # 開始角度のオフセットを追加
-        angles += angle_via_values[0]
+        # 累積角度を連続的に調整（最短経路を維持、-π〜πに収める）
+        # 各サンプル間の差分を-π〜πに保ちつつ、連続性を維持
+        angles = np.zeros_like(angles_cumulative)
+        angles[0] = np.arctan2(np.sin(angles_cumulative[0]), np.cos(angles_cumulative[0]))
+
+        for i in range(1, len(angles_cumulative)):
+            # 前のサンプルからの差分
+            diff = angles_cumulative[i] - angles_cumulative[i-1]
+            # 差分を-π〜πに正規化（最短経路を選択）
+            diff_normalized = np.arctan2(np.sin(diff), np.cos(diff))
+            # 前の角度に正規化差分を加算
+            angles[i] = angles[i-1] + diff_normalized
+
+            # ±πを超えた場合のみ2πを加減算して-π〜πに調整
+            while angles[i] > np.pi:
+                angles[i] -= 2 * np.pi
+            while angles[i] < -np.pi:
+                angles[i] += 2 * np.pi
 
         return angles, angular_velocities
 

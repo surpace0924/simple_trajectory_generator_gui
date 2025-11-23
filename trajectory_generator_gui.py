@@ -1,44 +1,90 @@
 # -*- coding: utf-8 -*-
+"""経路生成GUIアプリケーション
+
+このモジュールは、ロボットの経路生成を行うためのGUIアプリケーションです。
+経由点の設定、制約条件の指定、経路の生成・可視化を行います。
+"""
 import sys
 import os
-from PyQt5.QtCore import pyqtSlot
-from PyQt5.QtWidgets import QApplication, QMainWindow, QMenu, QVBoxLayout, QSizePolicy, QMessageBox, QWidget, QPushButton,QComboBox,QListView,QLabel,QTableWidgetItem, QFileDialog
-from PyQt5.QtGui import QIcon
-from trajectory_generator_ui import Ui_MainWindow
-import numpy as np
 import json
 import datetime
-from collections import OrderedDict
+from typing import List, Dict, Any, Optional
 
+import numpy as np
+from PyQt5.QtCore import pyqtSlot
+from PyQt5.QtWidgets import (
+    QApplication,
+    QMainWindow,
+    QTableWidgetItem,
+    QFileDialog
+)
+
+from trajectory_generator_ui import Ui_MainWindow
 from classes import trajectory_viewer
 from classes import graph_viewer
 from classes import trajectory_calculator
 from classes import plot_canvas
 
-import matplotlib.pyplot as plt
+# 定数定義
+CANVAS_X_POSITION = 20
+CANVAS_Y_POSITION = 100
+CANVAS_WIDTH = 4.5
+CANVAS_HEIGHT = 3.8
+MIN_VIA_POINTS = 3
+TABLE_COLUMN_COUNT = 4
+COLUMN_INDEX_ANGLE = 2
+COLUMN_INDEX_SPEED = 3
 
 class TrajectoryGeneratorGui(QMainWindow, Ui_MainWindow):
-    def __init__(self, parent=None):
+    """経路生成GUIメインウィンドウ
+
+    ロボットの経路生成を行うためのGUIアプリケーションのメインクラスです。
+    経由点の設定、制約条件の指定、経路の生成・可視化を行います。
+
+    Attributes:
+        canvas: matplotlib描画キャンバス
+        app_param: アプリケーション設定パラメータ辞書
+        tc: 経路計算機
+        via_points: 経由点の座標リスト
+        via_speed: 経由点での目標速度リスト
+        use_via_angle: 経由点の角度制約を使用するかのリスト
+        use_via_speed: 経由点の速度制約を使用するかのリスト
+    """
+
+    def __init__(self, parent: Optional[QMainWindow] = None) -> None:
+        """コンストラクタ
+
+        Args:
+            parent: 親ウィンドウ（オプション）
+        """
         super(TrajectoryGeneratorGui, self).__init__(parent)
         self.setupUi(self)
 
         # matplotlibの領域を描画
-        self.canvas = plot_canvas.PlotCanvas(self, width=4.5, height=3.8)
-        self.canvas.move(20, 100)
+        self.canvas = plot_canvas.PlotCanvas(
+            self,
+            width=CANVAS_WIDTH,
+            height=CANVAS_HEIGHT
+        )
+        self.canvas.move(CANVAS_X_POSITION, CANVAS_Y_POSITION)
 
         # 設定ファイルに書き込まれるパラメータ辞書
-        self.app_param = {}
+        self.app_param: Dict[str, Any] = {}
 
         # 経路計算機
         self.tc = trajectory_calculator.TrajectoryCalculator()
-        self.via_points = []    # 経由点の座標リスト
-        self.via_speed = []     # 経由点での司令速度リスト
-        self.use_via_angle = [] # 経由点の角度を使用するかのリスト
-        self.use_via_speed = [] # 経由点での司令速度を使用するかのリスト
+        self.via_points: List[List[float]] = []  # 経由点の座標リスト
+        self.via_speed: List[float] = []  # 経由点での目標速度リスト
+        self.use_via_angle: List[bool] = []  # 経由点の角度制約を使用するか
+        self.use_via_speed: List[bool] = []  # 経由点の速度制約を使用するか
 
 
     @pyqtSlot()
-    def button_generate_Click(self):
+    def button_generate_Click(self) -> None:
+        """経路生成ボタンのクリックイベントハンドラ
+
+        制約条件と経由点から経路を生成し、結果を表示します。
+        """
         # 制約条件の設定
         try:
             self.tc.setMaxLinearJerk(float(self.lineEdit_01.text()))
@@ -46,19 +92,15 @@ class TrajectoryGeneratorGui(QMainWindow, Ui_MainWindow):
             self.tc.setMaxLinearSpeed(float(self.lineEdit_03.text()))
             self.tc.setFrequency(float(self.lineEdit_07.text()))
             self.tc.setDotGap(float(self.lineEdit_08.text()))
-
         except ValueError:
-            self.textBrowser.append("")
-            self.textBrowser.append("----- " + str(datetime.datetime.now()) + " -----")
-            self.textBrowser.append("[Error] 制約条件の入力値が不正です")
-            self.redraw()
+            self._print_log("[Error] 制約条件の入力値が不正です")
             return
 
         # 経由点の座標と速度を設定
-        self.updateViaPoints()
+        self._update_via_points()
 
-        if len(self.via_points) < 3:
-            self.printLog("[Error] 3つ以上の経由点を指定してください")
+        if len(self.via_points) < MIN_VIA_POINTS:
+            self._print_log(f"[Error] {MIN_VIA_POINTS}つ以上の経由点を指定してください")
             return
 
         self.tc.setViaPoint(np.array(self.via_points))
@@ -70,95 +112,133 @@ class TrajectoryGeneratorGui(QMainWindow, Ui_MainWindow):
         self.tc.calculate()
 
         # 結果表示
-        self.textBrowser.append("")
-        self.textBrowser.append("----- " + str(datetime.datetime.now()) + " -----")
-        self.textBrowser.append("経路生成終了")
-        self.textBrowser.append("経路長　: " + '{0:.3f}'.format(self.tc.getTrajectoryLength()) + " [m]")
-        self.textBrowser.append("到達時間: " + '{0:.3f}'.format(self.tc.getExpectedTime()) + " [sec]")
-        self.textBrowser.append("最大速度: " + '{0:.3f}'.format(max(self.tc.getSpeedProfileProfile())) + " [m/s]")
+        trajectory_length = self.tc.getTrajectoryLength()
+        expected_time = self.tc.getExpectedTime()
+        max_speed = max(self.tc.getSpeedProfileProfile())
+
+        self._print_log(
+            "経路生成終了\n"
+            f"経路長　: {trajectory_length:.3f} [m]\n"
+            f"到達時間: {expected_time:.3f} [sec]\n"
+            f"最大速度: {max_speed:.3f} [m/s]"
+        )
 
         # 描画
-        self.canvas.drawTrajectory(self.tc.getTrajectory(), self.tc.getSpeedProfileProfile())
-        self.redraw()
+        self.canvas.drawTrajectory(
+            self.tc.getTrajectory(),
+            self.tc.getSpeedProfileProfile()
+        )
+        self._redraw()
 
-    def redraw(self):
-        self.resize(self.width(), self.height()+1)
-        self.resize(self.width(), self.height()-1)
+    def _redraw(self) -> None:
+        """ウィンドウを再描画する
+
+        PyQt5の描画更新を強制するためのハック。
+        ウィンドウサイズを1px変更して元に戻すことで再描画を促す。
+        """
+        self.resize(self.width(), self.height() + 1)
+        self.resize(self.width(), self.height() - 1)
+
+    def _print_log(self, text: str) -> None:
+        """ログメッセージをテキストブラウザに出力する
+
+        Args:
+            text: 出力するメッセージ
+        """
+        self.textBrowser.append("")
+        self.textBrowser.append(f"----- {datetime.datetime.now()} -----")
+        self.textBrowser.append(text)
 
 
-    # ファイル保存
-    def button_export_Click(self):
+    @pyqtSlot()
+    def button_export_Click(self) -> None:
+        """経路データをCSVファイルにエクスポート"""
         # 保存先の取得
-        fname, selectedFilter = QFileDialog.getSaveFileName(self, 'ファイルの保存', 'trajectory.csv')
-        if fname == "":
+        fname, _ = QFileDialog.getSaveFileName(
+            self,
+            'ファイルの保存',
+            'trajectory.csv'
+        )
+        if not fname:
             return
 
-        # 書き込むテキストの生成
-        # float64 tolerance_linear
-        # float64 tolerance_angular
-        # float64 max_speed_linear
-        # float64 max_speed_angular
-        # float64 max_acceleration_linear
-        # float64 max_acceleration_angular
-        # float64 max_jerk_linear
-        # float64 max_jerk_angular
-        max_acceleration_angular = max(self.tc.getAngularSpeedProfileProfile())
-        if abs(min(self.tc.getAngularSpeedProfileProfile())) > max_acceleration_angular:
-            max_acceleration_angular = abs(min(self.tc.getAngularSpeedProfileProfile()))
-        if max_acceleration_angular < 1:
-            max_acceleration_angular = 1
-        write_text = self.lineEdit_8.text() + "," + \
-                     self.lineEdit_9.text() + "," + \
-                     str(max(self.tc.getSpeedProfileProfile())) + "," + \
-                     str(max_acceleration_angular) + "\n"
+        # 最大角速度の計算
+        angular_speeds = self.tc.getAngularSpeedProfileProfile()
+        max_angular_speed = max(abs(max(angular_speeds)), abs(min(angular_speeds)))
+        if max_angular_speed < 1.0:
+            max_angular_speed = 1.0
 
+        # ヘッダー行の生成（CSV形式）
+        header = (
+            f"{self.lineEdit_8.text()},"
+            f"{self.lineEdit_9.text()},"
+            f"{max(self.tc.getSpeedProfileProfile())},"
+            f"{max_angular_speed}\n"
+        )
 
-        for i in range(len(self.tc.getTrajectory())):
-            write_text += str(self.tc.getTrajectory()[i][0])
-            write_text += ","
-            write_text += str(self.tc.getTrajectory()[i][1])
-            write_text += ","
-            write_text += str(self.tc.getTrajectory()[i][2])
-            write_text += "\n"
+        # 経路データの生成
+        trajectory = self.tc.getTrajectory()
+        trajectory_lines = [
+            f"{point[0]},{point[1]},{point[2]}\n"
+            for point in trajectory
+        ]
 
-        # 書き込み
-        self.saveFile(fname, write_text)
-        self.redraw()
+        # ファイルに書き込み
+        write_text = header + ''.join(trajectory_lines)
+        self._save_file(fname, write_text)
+        self._redraw()
 
-    # セルを一つ上に
-    def button_cell_up_Click(self):
+    @pyqtSlot()
+    def button_cell_up_Click(self) -> None:
+        """テーブルの選択行を1つ上に移動"""
         current_row = self.tableWidget.currentRow()
-        self.exchangeTalbeRow(current_row - 1, current_row)
-        self.redraw()
+        self._exchange_table_row(current_row - 1, current_row)
+        self._redraw()
 
-    # セルを一つ下に
-    def button_cell_down_Click(self):
+    @pyqtSlot()
+    def button_cell_down_Click(self) -> None:
+        """テーブルの選択行を1つ下に移動"""
         current_row = self.tableWidget.currentRow()
-        self.exchangeTalbeRow(current_row + 1, current_row)
-        self.redraw()
+        self._exchange_table_row(current_row + 1, current_row)
+        self._redraw()
 
-    # tableの変更イベント
-    def cell_changed(self):
+    @pyqtSlot()
+    def cell_changed(self) -> None:
+        """テーブルの内容が変更されたときのイベントハンドラ"""
         # tableの値をリストに書き込む
-        self.updateViaPoints()
+        self._update_via_points()
 
         # 制御点を再描画
         self.canvas.drawControlPoint(self.via_points)
 
-    def button_cell_add_Click(self):
-        self.redraw()
+    @pyqtSlot()
+    def button_cell_add_Click(self) -> None:
+        """経由点を追加"""
+        self._redraw()
 
-    def button_deg2rad(self):
-        deg = float(self.lineEdit_10.text())
-        rad = deg*np.pi/180
-        self.lineEdit_11.setText('{0:.5f}'.format(rad))
+    @pyqtSlot()
+    def button_deg2rad(self) -> None:
+        """角度を度からラジアンに変換"""
+        try:
+            deg = float(self.lineEdit_10.text())
+            rad = deg * np.pi / 180.0
+            self.lineEdit_11.setText(f'{rad:.5f}')
+        except ValueError:
+            self._print_log("[Error] 角度の入力値が不正です")
 
-    def button_rad2deg(self):
-        rad = float(self.lineEdit_11.text())
-        deg = rad/np.pi*180
-        self.lineEdit_10.setText('{0:.5f}'.format(deg))
+    @pyqtSlot()
+    def button_rad2deg(self) -> None:
+        """角度をラジアンから度に変換"""
+        try:
+            rad = float(self.lineEdit_11.text())
+            deg = rad / np.pi * 180.0
+            self.lineEdit_10.setText(f'{deg:.5f}')
+        except ValueError:
+            self._print_log("[Error] 角度の入力値が不正です")
 
-    def button_cell_delete_Click(self):
+    @pyqtSlot()
+    def button_cell_delete_Click(self) -> None:
+        """選択された経由点を削除"""
         # 削除する行の特定
         current_row = self.tableWidget.currentRow()
 
@@ -166,27 +246,31 @@ class TrajectoryGeneratorGui(QMainWindow, Ui_MainWindow):
         self.tableWidget.removeRow(current_row)
 
         # リストを更新
-        self.updateViaPoints()
+        self._update_via_points()
 
         # 点の再描画
         self.canvas.drawControlPoint(self.via_points)
-        self.redraw()
+        self._redraw()
 
-    def printLog(self, text):
-        self.textBrowser.append("")
-        self.textBrowser.append("----- " + str(datetime.datetime.now()) + " -----")
-        self.textBrowser.append(text)
-
-    # 設定ファイル読み込み
-    def button_select_settingfile(self):
-        fname, selectedFilter = QFileDialog.getOpenFileName(self, 'ファイルの読み込み', 'setting.json')
-        if fname == '':
+    @pyqtSlot()
+    def button_select_settingfile(self) -> None:
+        """設定ファイルを読み込んでGUIに反映"""
+        fname, _ = QFileDialog.getOpenFileName(
+            self,
+            'ファイルの読み込み',
+            'setting.json'
+        )
+        if not fname:
             return
 
-        with open(fname) as f:
-            self.app_param = json.load(f)
+        try:
+            with open(fname, 'r', encoding='utf-8') as f:
+                self.app_param = json.load(f)
+        except (IOError, json.JSONDecodeError) as e:
+            self._print_log(f"[Error] 設定ファイルの読み込みに失敗しました: {e}")
+            return
 
-        # 各lineEdit，tableに反映
+        # 各lineEditに反映
         try:
             self.lineEdit_00.setText(fname)
             self.lineEdit_01.setText(self.app_param['max_linear_jerk'])
@@ -197,151 +281,226 @@ class TrajectoryGeneratorGui(QMainWindow, Ui_MainWindow):
             self.lineEdit_04.setText(self.app_param['disp_period'])
             self.lineEdit_8.setText(self.app_param['linear_tolerance'])
             self.lineEdit_9.setText(self.app_param['angular_tolerance'])
-        except KeyError:
-            print("不正な設定ファイルです．一部のデータの読み込みに失敗しました．")
+        except KeyError as e:
+            self._print_log(f"[Warning] 一部のパラメータが見つかりません: {e}")
 
-        index = self.comboBox.findText(self.app_param['robot'])
-        if index >= 0:
-            self.comboBox.setCurrentIndex(index)
+        # ロボット選択コンボボックスの設定
+        if 'robot' in self.app_param:
+            index = self.comboBox.findText(self.app_param['robot'])
+            if index >= 0:
+                self.comboBox.setCurrentIndex(index)
 
-        # tableをクリアし，座標の数だけ行を用意
-        items = self.app_param['table']
-        self.tableWidget.clearContents()
-        self.tableWidget.setRowCount(len(items))
+        # tableに経由点データを反映
+        if 'table' in self.app_param:
+            items = self.app_param['table']
+            self.tableWidget.clearContents()
+            self.tableWidget.setRowCount(len(items))
 
-        # tableへの書き込み
-        for r, item in enumerate(items):
-            for c in range(len(item)):
-                self.tableWidget.setItem(r, c, QTableWidgetItem(item[c]))
-        self.redraw()
+            for r, item in enumerate(items):
+                for c in range(len(item)):
+                    self.tableWidget.setItem(r, c, QTableWidgetItem(item[c]))
+
+        self._redraw()
 
 
-    # 設定ファイルのエクスポート
-    def button_export_settingfile(self):
-        # 制約条件など
-        self.app_param['max_linear_jerk']          = self.lineEdit_01.text()
-        self.app_param['max_linear_acceleration']  = self.lineEdit_02.text()
-        self.app_param['max_linear_speed']         = self.lineEdit_03.text()
-        self.app_param['hz']                       = self.lineEdit_07.text()
-        self.app_param['precision']                = self.lineEdit_08.text()
-        self.app_param['linear_tolerance']         = self.lineEdit_8.text()
-        self.app_param['angular_tolerance']        = self.lineEdit_9.text()
-        self.app_param['disp_period']              = self.lineEdit_04.text()
-        self.app_param['robot']                    = self.comboBox.currentText()
+    @pyqtSlot()
+    def button_export_settingfile(self) -> None:
+        """現在の設定をJSONファイルにエクスポート"""
+        # 制約条件などをパラメータ辞書に保存
+        self.app_param['max_linear_jerk'] = self.lineEdit_01.text()
+        self.app_param['max_linear_acceleration'] = self.lineEdit_02.text()
+        self.app_param['max_linear_speed'] = self.lineEdit_03.text()
+        self.app_param['hz'] = self.lineEdit_07.text()
+        self.app_param['precision'] = self.lineEdit_08.text()
+        self.app_param['linear_tolerance'] = self.lineEdit_8.text()
+        self.app_param['angular_tolerance'] = self.lineEdit_9.text()
+        self.app_param['disp_period'] = self.lineEdit_04.text()
+        self.app_param['robot'] = self.comboBox.currentText()
 
-        # Tableデータ
+        # Tableデータの取得
         table_val = []
         for row in range(self.tableWidget.rowCount()):
             row_data = []
-            for column in range(4):
-                row_data.append(self.tableWidget.item(row, column).text())
+            for column in range(TABLE_COLUMN_COUNT):
+                item = self.tableWidget.item(row, column)
+                row_data.append(item.text() if item else "")
             table_val.append(row_data)
         self.app_param['table'] = table_val
 
         # 保存先の取得
-        fname, selectedFilter = QFileDialog.getSaveFileName(self, 'ファイルの保存', 'setting.json')
-        if fname == '':
+        fname, _ = QFileDialog.getSaveFileName(
+            self,
+            'ファイルの保存',
+            'setting.json'
+        )
+        if not fname:
             return
-        # 辞書型をjsonの文字列に変換
-        write_text = json.dumps(self.app_param)
-        # 書き込み
-        self.saveFile(fname, write_text)
-        self.redraw()
 
-    def button_open_map(self):
-        self.redraw()
+        # JSON形式で書き込み
+        write_text = json.dumps(self.app_param, indent=2, ensure_ascii=False)
+        self._save_file(fname, write_text)
+        self._redraw()
 
-    def button_adjust_origin(self):
-        point = [0, 0]
-        point[0] = float(self.lineEdit_6.text())
-        point[1] = float(self.lineEdit_7.text())
-        self.canvas.drawOrigin(point)
-        self.redraw()
+    @pyqtSlot()
+    def button_open_map(self) -> None:
+        """マップを開く"""
+        self._redraw()
 
-    def button_curvature_check(self):
+    @pyqtSlot()
+    def button_adjust_origin(self) -> None:
+        """原点位置を調整"""
+        try:
+            point = [
+                float(self.lineEdit_6.text()),
+                float(self.lineEdit_7.text())
+            ]
+            self.canvas.drawOrigin(point)
+            self._redraw()
+        except ValueError:
+            self._print_log("[Error] 原点座標の入力値が不正です")
+
+    @pyqtSlot()
+    def button_curvature_check(self) -> None:
+        """曲率プロファイルを表示"""
         gv = graph_viewer.GraphViewer()
-        gv.displayCurvatureProfile(self.tc.getTrajectoryLengthList(), self.tc.getCurvature())
-        self.redraw()
+        gv.displayCurvatureProfile(
+            self.tc.getTrajectoryLengthList(),
+            self.tc.getCurvature()
+        )
+        self._redraw()
 
-    def button_speed_check(self):
+    @pyqtSlot()
+    def button_speed_check(self) -> None:
+        """速度プロファイルを表示"""
         gv = graph_viewer.GraphViewer()
-        gv.displaySpeedProfile(self.tc.getTimeStamp(), self.tc.getSpeedProfileProfile())
-        self.redraw()
+        gv.displaySpeedProfile(
+            self.tc.getTimeStamp(),
+            self.tc.getSpeedProfileProfile()
+        )
+        self._redraw()
 
-    def button_angular_speed_check(self):
+    @pyqtSlot()
+    def button_angular_speed_check(self) -> None:
+        """角速度プロファイルを表示"""
         gv = graph_viewer.GraphViewer()
-        gv.displayAngularSpeedProfile(self.tc.getTimeStamp(), self.tc.getAngularSpeedProfileProfile())
-        self.redraw()
+        gv.displayAngularSpeedProfile(
+            self.tc.getTimeStamp(),
+            self.tc.getAngularSpeedProfileProfile()
+        )
+        self._redraw()
 
-    def button_acceleration_check(self):
+    @pyqtSlot()
+    def button_acceleration_check(self) -> None:
+        """加速度プロファイルを表示"""
         gv = graph_viewer.GraphViewer()
-        gv.displayAccelerationProfile(self.tc.getTimeStamp(), self.tc.getAccelerationProfile())
-        self.redraw()
+        gv.displayAccelerationProfile(
+            self.tc.getTimeStamp(),
+            self.tc.getAccelerationProfile()
+        )
+        self._redraw()
 
-    def button_angle_check(self):
+    @pyqtSlot()
+    def button_angle_check(self) -> None:
+        """角度プロファイルを表示"""
         gv = graph_viewer.GraphViewer()
-        gv.displayAngleProfile(self.tc.getTimeStamp(), [l[2] for l in self.tc.getTrajectory()])
-        self.redraw()
+        angles = [point[2] for point in self.tc.getTrajectory()]
+        gv.displayAngleProfile(self.tc.getTimeStamp(), angles)
+        self._redraw()
 
-    def button_view_result(self):
+    @pyqtSlot()
+    def button_view_result(self) -> None:
+        """経路のアニメーション表示"""
+        try:
+            disp_period = float(self.lineEdit_04.text())
+        except ValueError:
+            self._print_log("[Error] 表示周期の入力値が不正です")
+            return
+
         tv = trajectory_viewer.TrajectoryViewer(
-            poses = self.tc.getTrajectory(),
-            dot_hz = self.tc.getFrequency(),
-            disp_period = float(self.lineEdit_04.text()),
-            robot = self.comboBox.currentText(),
-            speed_profile = self.tc.getSpeedProfileProfile())
+            poses=self.tc.getTrajectory(),
+            dot_hz=self.tc.getFrequency(),
+            disp_period=disp_period,
+            robot=self.comboBox.currentText(),
+            speed_profile=self.tc.getSpeedProfileProfile()
+        )
         tv.display()
-        self.redraw()
+        self._redraw()
 
-    # tableの行を入れ替える
-    def exchangeTalbeRow(self, row1, row2):
+    def _exchange_table_row(self, row1: int, row2: int) -> None:
+        """テーブルの2行を入れ替える
+
+        Args:
+            row1: 入れ替える行1のインデックス
+            row2: 入れ替える行2のインデックス
+        """
         for col in range(self.tableWidget.columnCount()):
-                temp = self.tableWidget.takeItem(row1, col)
-                self.tableWidget.setItem(row1, col, self.tableWidget.takeItem(row2, col))
-                self.tableWidget.setItem(row2, col, temp)
+            temp = self.tableWidget.takeItem(row1, col)
+            self.tableWidget.setItem(row1, col, self.tableWidget.takeItem(row2, col))
+            self.tableWidget.setItem(row2, col, temp)
         self.tableWidget.setCurrentCell(row1, self.tableWidget.currentColumn())
 
-    # tableの値を読み込み，配列化
-    def updateViaPoints(self):
+    def _update_via_points(self) -> None:
+        """テーブルの値を読み込んで経由点リストを更新
+
+        テーブルの各行から座標、角度、速度を読み取り、
+        内部の経由点リストを更新します。空欄の場合は制約なしとして扱います。
+        """
         row_num = self.tableWidget.rowCount()
-        self.use_via_angle = [True]*row_num
-        self.use_via_speed = [True]*row_num
+        self.use_via_angle = [True] * row_num
+        self.use_via_speed = [True] * row_num
 
         # Tableを走査していき値を代入
         table_data_list = []
         for row in range(row_num):
             row_data = []
-            for column in range(4):
+            for column in range(TABLE_COLUMN_COUNT):
                 # 各要素を読み込み
                 try:
-                    item_str = self.tableWidget.item(row, column).text()
+                    item = self.tableWidget.item(row, column)
+                    if item is None:
+                        return
+                    item_str = item.text()
                 except AttributeError:
-                    return -1
+                    return
+
                 try:
                     item_float = float(item_str)
-
                 except ValueError:
                     # 空欄判定
-                    if column == 2:
+                    if column == COLUMN_INDEX_ANGLE:
                         self.use_via_angle[row] = False
-                    if column == 3:
+                    if column == COLUMN_INDEX_SPEED:
                         self.use_via_speed[row] = False
+                    item_float = 0.0
 
                 row_data.append(item_float)
             table_data_list.append(row_data)
 
-        self.via_points = [l[:3] for l in table_data_list]
-        self.via_speed = [l[3] for l in table_data_list]
+        self.via_points = [row[:3] for row in table_data_list]
+        self.via_speed = [row[3] for row in table_data_list]
+
+    def _save_file(self, name: str, text: str) -> None:
+        """テキストをファイルに保存
+
+        Args:
+            name: 保存先ファイルパス
+            text: 保存するテキスト内容
+        """
+        try:
+            with open(name, mode='w', encoding='utf-8') as f:
+                f.write(text)
+        except IOError as e:
+            self._print_log(f"[Error] ファイルの保存に失敗しました: {e}")
 
 
-    def saveFile(self, name, text):
-        with open(name, mode='w') as f:
-            f.write(text)
+def main() -> None:
+    """メインエントリーポイント"""
+    app = QApplication(sys.argv)
+    gui = TrajectoryGeneratorGui()
+    gui.show()
+    sys.exit(app.exec_())
+
 
 if __name__ == '__main__':
-    argvs = sys.argv
-    app = QApplication(argvs)
-    trajectory_generator_gui = TrajectoryGeneratorGui()
-    trajectory_generator_gui.show()
-    sys.exit(app.exec_())
+    main()
 

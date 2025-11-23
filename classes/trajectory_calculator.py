@@ -3,10 +3,13 @@
 
 このモジュールは、経由点と制約条件から最適な経路を計算します。
 """
+from typing import List, Optional
 import numpy as np
 from classes import catmull_rom
 from classes import speed_profile
 from classes import min_jerk_profile
+from classes.models import TrajectoryConfig, ViaPoint, TrajectoryResult
+from classes.exceptions import InvalidViaPointError, CalculationError
 
 
 class TrajectoryCalculator():

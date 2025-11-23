@@ -7,11 +7,10 @@
 from typing import List
 import numpy as np
 
-from classes.catmull_rom import CatmullRom
-from classes.speed_profile import SpeedProfile
-from classes.min_jerk_profile import MinJerkProfile
-from classes.models import TrajectoryConfig, ViaPoint, TrajectoryResult, ViaPointValidator
-from classes.exceptions import InvalidViaPointError, CalculationError
+from trajectory_generator.core.catmull_rom import CatmullRom
+from trajectory_generator.core.speed_profile import SpeedProfile
+from trajectory_generator.models import TrajectoryConfig, ViaPoint, TrajectoryResult, ViaPointValidator
+from trajectory_generator.exceptions import InvalidViaPointError, CalculationError
 
 
 class TrajectoryPlanner:
@@ -227,7 +226,7 @@ class TrajectoryPlanner:
         trajectory: List,
         timestamps: List[float]
     ) -> tuple:
-        """角度プロファイルの計算
+        """角度プロファイルの計算（SpeedProfile使用）
 
         Args:
             via_points: 経由点のリスト
@@ -237,9 +236,9 @@ class TrajectoryPlanner:
         Returns:
             (angles, angular_velocities)のタプル
         """
-        # 角度制約のある経由点の時刻とその角度
-        via_time_stamps = [0.0]
-        via_angles = [via_points[0].angle if via_points[0].angle is not None else 0.0]
+        # 角度制約のある経由点の時刻とその角度を収集
+        angle_via_times = [0.0]
+        angle_via_values = [via_points[0].angle if via_points[0].angle is not None else 0.0]
 
         # 中間の角度制約を収集
         for i, via_point in enumerate(via_points):
@@ -250,47 +249,84 @@ class TrajectoryPlanner:
 
             # この経由点に最も近い軌跡点の時刻を検索
             time = self._find_nearest_time(via_point, trajectory, timestamps)
-            via_time_stamps.append(time)
-            via_angles.append(via_point.angle)
+            angle_via_times.append(time)
+            angle_via_values.append(via_point.angle)
 
         # 終点を追加
         end_time = timestamps[-1]
-        via_time_stamps.append(end_time)
+        angle_via_times.append(end_time)
         last_angle = via_points[-1].angle if via_points[-1].angle is not None else 0.0
-        via_angles.append(last_angle)
+        angle_via_values.append(last_angle)
 
-        # 各タイムスタンプで角度を計算
-        angles = np.empty(0)
-        angular_velocities = np.empty(0)
+        # 角度制約間の距離（角度差）を計算
+        angle_sections = []
+        for i in range(len(angle_via_values) - 1):
+            angle_diff = angle_via_values[i + 1] - angle_via_values[i]
+            angle_sections.append(angle_diff)
 
-        for t in timestamps:
-            # どの区間に属するか特定
-            # via_time_stamps[idx-1] <= t < via_time_stamps[idx] となるidxを見つける
-            idx = 1
-            for i in range(1, len(via_time_stamps)):
-                if t < via_time_stamps[i]:
-                    idx = i
-                    break
-            else:
-                # ループが完了した場合は最後の区間
-                idx = len(via_time_stamps) - 1
+        # SpeedProfileで角度プロファイルを生成
+        angle_timestamps = []
+        angles_list = []
+        angular_velocities_list = []
 
-            # MinJerkProfileで角度を補間
-            dt = via_time_stamps[idx] - via_time_stamps[idx - 1]
-            if dt > 0:
-                mjp = MinJerkProfile(
-                    x_start=via_angles[idx - 1],
-                    x_target=via_angles[idx],
-                    time=dt
-                )
-                angles = np.append(angles, mjp.x(t - via_time_stamps[idx - 1]))
-                angular_velocities = np.append(
-                    angular_velocities,
-                    mjp.v(t - via_time_stamps[idx - 1])
-                )
-            else:
-                angles = np.append(angles, via_angles[idx])
-                angular_velocities = np.append(angular_velocities, 0.0)
+        # 角速度制約（角度用の制約を設定）
+        # 線形速度の制約を角速度に適用（rad/s）
+        max_angular_jerk = self.config.max_linear_jerk  # [rad/s³]
+        max_angular_accel = self.config.max_linear_acceleration  # [rad/s²]
+        max_angular_speed = self.config.max_linear_speed  # [rad/s]
+
+        sp_angle = SpeedProfile()
+
+        for i, angle_section in enumerate(angle_sections):
+            # 実際の軌跡における区間の時間
+            section_start_time = angle_via_times[i]
+            section_end_time = angle_via_times[i + 1]
+            section_duration = section_end_time - section_start_time
+
+            t0 = sp_angle.t_end()
+            sp_angle.reset(
+                j_max=max_angular_jerk,
+                a_max=max_angular_accel,
+                v_sat=max_angular_speed,
+                v_start=0.0,  # 各区間の始点・終点で角速度ゼロ
+                v_target=0.0,
+                dist=angle_section,  # 角度差
+                x_start=sp_angle.x_end(),
+                t_start=sp_angle.t_end()
+            )
+
+            # SpeedProfileが生成した実際の所要時間
+            sp_duration = sp_angle.t_end() - t0
+
+            # 軌跡の実時間に合わせてサンプリング
+            num_samples = int(section_duration * self.config.control_frequency)
+            for j in range(num_samples):
+                # 実際の時刻
+                actual_t = section_start_time + j / self.config.control_frequency
+
+                # SpeedProfile内での時刻（実時間に対する正規化比率でスケーリング）
+                # 軌跡の実時間をSpeedProfileの時間にマッピング
+                time_ratio = (actual_t - section_start_time) / section_duration
+                sp_t = t0 + time_ratio * sp_duration
+
+                angle_timestamps.append(actual_t)
+                angles_list.append(sp_angle.x(sp_t))
+
+                # 角速度も時間スケーリングに応じて調整
+                # v_actual = v_sp * (sp_duration / section_duration)
+                angular_velocities_list.append(sp_angle.v(sp_t) * (sp_duration / section_duration))
+
+        # 終点を追加
+        angle_timestamps.append(end_time)
+        angles_list.append(sp_angle.x(sp_angle.t_end()))
+        angular_velocities_list.append(0.0)  # 終点では角速度ゼロ
+
+        # 元のタイムスタンプに合わせて補間
+        angles = np.interp(timestamps, angle_timestamps, angles_list)
+        angular_velocities = np.interp(timestamps, angle_timestamps, angular_velocities_list)
+
+        # 開始角度のオフセットを追加
+        angles += angle_via_values[0]
 
         return angles, angular_velocities
 

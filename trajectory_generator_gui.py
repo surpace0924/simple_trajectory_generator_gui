@@ -19,11 +19,17 @@ from PyQt5.QtWidgets import (
     QFileDialog
 )
 
-from trajectory_generator_ui import Ui_MainWindow
-from classes import trajectory_viewer
-from classes import graph_viewer
-from classes import trajectory_calculator
-from classes import plot_canvas
+from trajectory_generator.resources.trajectory_generator_ui import Ui_MainWindow
+from trajectory_generator.gui import trajectory_viewer
+from trajectory_generator.gui import graph_viewer
+from trajectory_generator.core.trajectory_planner import TrajectoryPlanner
+from trajectory_generator.models.models import TrajectoryConfig, ViaPoint, TrajectoryResult
+from trajectory_generator.exceptions import (
+    InvalidViaPointError,
+    InvalidConfigurationError,
+    CalculationError
+)
+from trajectory_generator.gui import plot_canvas
 
 # 定数定義
 CANVAS_X_POSITION = 20
@@ -35,6 +41,7 @@ TABLE_COLUMN_COUNT = 4
 COLUMN_INDEX_ANGLE = 2
 COLUMN_INDEX_SPEED = 3
 
+
 class TrajectoryGeneratorGui(QMainWindow, Ui_MainWindow):
     """経路生成GUIメインウィンドウ
 
@@ -44,7 +51,7 @@ class TrajectoryGeneratorGui(QMainWindow, Ui_MainWindow):
     Attributes:
         canvas: matplotlib描画キャンバス
         app_param: アプリケーション設定パラメータ辞書
-        tc: 経路計算機
+        result: 経路計算結果（TrajectoryResult）
         via_points: 経由点の座標リスト
         via_speed: 経由点での目標速度リスト
         use_via_angle: 経由点の角度制約を使用するかのリスト
@@ -71,13 +78,12 @@ class TrajectoryGeneratorGui(QMainWindow, Ui_MainWindow):
         # 設定ファイルに書き込まれるパラメータ辞書
         self.app_param: Dict[str, Any] = {}
 
-        # 経路計算機
-        self.tc = trajectory_calculator.TrajectoryCalculator()
+        # 経路計算結果（初期値はNone）
+        self.result: Optional[TrajectoryResult] = None
         self.via_points: List[List[float]] = []  # 経由点の座標リスト
         self.via_speed: List[float] = []  # 経由点での目標速度リスト
         self.use_via_angle: List[bool] = []  # 経由点の角度制約を使用するか
         self.use_via_speed: List[bool] = []  # 経由点の速度制約を使用するか
-
 
     @pyqtSlot()
     def button_generate_Click(self) -> None:
@@ -85,48 +91,72 @@ class TrajectoryGeneratorGui(QMainWindow, Ui_MainWindow):
 
         制約条件と経由点から経路を生成し、結果を表示します。
         """
-        # 制約条件の設定
-        try:
-            self.tc.setMaxLinearJerk(float(self.lineEdit_01.text()))
-            self.tc.setMaxLinearAcceleration(float(self.lineEdit_02.text()))
-            self.tc.setMaxLinearSpeed(float(self.lineEdit_03.text()))
-            self.tc.setFrequency(float(self.lineEdit_07.text()))
-            self.tc.setDotGap(float(self.lineEdit_08.text()))
-        except ValueError:
-            self._print_log("[Error] 制約条件の入力値が不正です")
-            return
-
-        # 経由点の座標と速度を設定
+        # 経由点の座標と速度を更新
         self._update_via_points()
 
         if len(self.via_points) < MIN_VIA_POINTS:
             self._print_log(f"[Error] {MIN_VIA_POINTS}つ以上の経由点を指定してください")
             return
 
-        self.tc.setViaPoint(np.array(self.via_points))
-        self.tc.setViaSpeed(self.via_speed)
-        self.tc.setUseViaAngle(self.use_via_angle)
-        self.tc.setUseViaSpeed(self.use_via_speed)
+        # 制約条件の設定
+        try:
+            config = TrajectoryConfig(
+                max_linear_jerk=float(self.lineEdit_01.text()),
+                max_linear_acceleration=float(self.lineEdit_02.text()),
+                max_linear_speed=float(self.lineEdit_03.text()),
+                control_frequency=int(self.lineEdit_07.text()),
+                precision=float(self.lineEdit_08.text())
+            )
+        except (ValueError, InvalidConfigurationError) as e:
+            self._print_log(f"[Error] 制約条件の入力値が不正です: {e}")
+            return
 
-        # 計算
-        self.tc.calculate()
+        # ViaPointオブジェクトのリストを作成
+        try:
+            via_point_objects = []
+            for i, (point, speed, use_angle, use_speed) in enumerate(
+                zip(self.via_points, self.via_speed, self.use_via_angle, self.use_via_speed)
+            ):
+                via_point_objects.append(
+                    ViaPoint(
+                        position=[point[0], point[1]],
+                        angle=point[2] if use_angle else None,
+                        speed=speed if use_speed else None,
+                        use_angle_constraint=use_angle,
+                        use_speed_constraint=use_speed
+                    )
+                )
+        except (ValueError, IndexError) as e:
+            self._print_log(f"[Error] 経由点データの変換に失敗しました: {e}")
+            return
+
+        # 経路計画の実行
+        try:
+            planner = TrajectoryPlanner(config)
+            self.result = planner.plan(via_point_objects)
+        except InvalidViaPointError as e:
+            self._print_log(f"[Error] 経由点が不正です: {e}")
+            return
+        except CalculationError as e:
+            self._print_log(f"[Error] 経路計算中にエラーが発生しました: {e}")
+            return
+        except Exception as e:
+            self._print_log(f"[Error] 予期しないエラーが発生しました: {e}")
+            return
 
         # 結果表示
-        trajectory_length = self.tc.getTrajectoryLength()
-        expected_time = self.tc.getExpectedTime()
-        max_speed = max(self.tc.getSpeedProfileProfile())
-
+        max_speed = np.max(self.result.velocities)
         self._print_log(
             "経路生成終了\n"
-            f"経路長　: {trajectory_length:.3f} [m]\n"
-            f"到達時間: {expected_time:.3f} [sec]\n"
+            f"経路長　: {self.result.total_length:.3f} [m]\n"
+            f"到達時間: {self.result.total_time:.3f} [sec]\n"
             f"最大速度: {max_speed:.3f} [m/s]"
         )
 
         # 描画
         self.canvas.drawTrajectory(
-            self.tc.getTrajectory(),
-            self.tc.getSpeedProfileProfile()
+            self.result.positions,
+            self.result.velocities
         )
         self._redraw()
 
@@ -149,10 +179,13 @@ class TrajectoryGeneratorGui(QMainWindow, Ui_MainWindow):
         self.textBrowser.append(f"----- {datetime.datetime.now()} -----")
         self.textBrowser.append(text)
 
-
     @pyqtSlot()
     def button_export_Click(self) -> None:
         """経路データをCSVファイルにエクスポート"""
+        if self.result is None:
+            self._print_log("[Error] 先に経路を生成してください")
+            return
+
         # 保存先の取得
         fname, _ = QFileDialog.getSaveFileName(
             self,
@@ -163,8 +196,7 @@ class TrajectoryGeneratorGui(QMainWindow, Ui_MainWindow):
             return
 
         # 最大角速度の計算
-        angular_speeds = self.tc.getAngularSpeedProfileProfile()
-        max_angular_speed = max(abs(max(angular_speeds)), abs(min(angular_speeds)))
+        max_angular_speed = np.max(np.abs(self.result.angular_velocities))
         if max_angular_speed < 1.0:
             max_angular_speed = 1.0
 
@@ -172,15 +204,14 @@ class TrajectoryGeneratorGui(QMainWindow, Ui_MainWindow):
         header = (
             f"{self.lineEdit_8.text()},"
             f"{self.lineEdit_9.text()},"
-            f"{max(self.tc.getSpeedProfileProfile())},"
+            f"{np.max(self.result.velocities)},"
             f"{max_angular_speed}\n"
         )
 
         # 経路データの生成
-        trajectory = self.tc.getTrajectory()
         trajectory_lines = [
             f"{point[0]},{point[1]},{point[2]}\n"
-            for point in trajectory
+            for point in self.result.positions
         ]
 
         # ファイルに書き込み
@@ -302,7 +333,6 @@ class TrajectoryGeneratorGui(QMainWindow, Ui_MainWindow):
 
         self._redraw()
 
-
     @pyqtSlot()
     def button_export_settingfile(self) -> None:
         """現在の設定をJSONファイルにエクスポート"""
@@ -362,66 +392,91 @@ class TrajectoryGeneratorGui(QMainWindow, Ui_MainWindow):
     @pyqtSlot()
     def button_curvature_check(self) -> None:
         """曲率プロファイルを表示"""
+        if self.result is None:
+            self._print_log("[Error] 先に経路を生成してください")
+            return
+
         gv = graph_viewer.GraphViewer()
         gv.displayCurvatureProfile(
-            self.tc.getTrajectoryLengthList(),
-            self.tc.getCurvature()
+            self.result.trajectory_length_list,
+            self.result.curvatures
         )
         self._redraw()
 
     @pyqtSlot()
     def button_speed_check(self) -> None:
         """速度プロファイルを表示"""
+        if self.result is None:
+            self._print_log("[Error] 先に経路を生成してください")
+            return
+
         gv = graph_viewer.GraphViewer()
         gv.displaySpeedProfile(
-            self.tc.getTimeStamp(),
-            self.tc.getSpeedProfileProfile()
+            self.result.timestamps,
+            self.result.velocities
         )
         self._redraw()
 
     @pyqtSlot()
     def button_angular_speed_check(self) -> None:
         """角速度プロファイルを表示"""
+        if self.result is None:
+            self._print_log("[Error] 先に経路を生成してください")
+            return
+
         gv = graph_viewer.GraphViewer()
         gv.displayAngularSpeedProfile(
-            self.tc.getTimeStamp(),
-            self.tc.getAngularSpeedProfileProfile()
+            self.result.timestamps,
+            self.result.angular_velocities
         )
         self._redraw()
 
     @pyqtSlot()
     def button_acceleration_check(self) -> None:
         """加速度プロファイルを表示"""
+        if self.result is None:
+            self._print_log("[Error] 先に経路を生成してください")
+            return
+
         gv = graph_viewer.GraphViewer()
         gv.displayAccelerationProfile(
-            self.tc.getTimeStamp(),
-            self.tc.getAccelerationProfile()
+            self.result.timestamps,
+            self.result.accelerations
         )
         self._redraw()
 
     @pyqtSlot()
     def button_angle_check(self) -> None:
         """角度プロファイルを表示"""
+        if self.result is None:
+            self._print_log("[Error] 先に経路を生成してください")
+            return
+
         gv = graph_viewer.GraphViewer()
-        angles = [point[2] for point in self.tc.getTrajectory()]
-        gv.displayAngleProfile(self.tc.getTimeStamp(), angles)
+        angles = [point[2] for point in self.result.positions]
+        gv.displayAngleProfile(self.result.timestamps, angles)
         self._redraw()
 
     @pyqtSlot()
     def button_view_result(self) -> None:
         """経路のアニメーション表示"""
+        if self.result is None:
+            self._print_log("[Error] 先に経路を生成してください")
+            return
+
         try:
             disp_period = float(self.lineEdit_04.text())
+            control_frequency = int(self.lineEdit_07.text())
         except ValueError:
-            self._print_log("[Error] 表示周期の入力値が不正です")
+            self._print_log("[Error] 表示周期または制御周波数の入力値が不正です")
             return
 
         tv = trajectory_viewer.TrajectoryViewer(
-            poses=self.tc.getTrajectory(),
-            dot_hz=self.tc.getFrequency(),
+            poses=self.result.positions,
+            dot_hz=control_frequency,
             disp_period=disp_period,
             robot=self.comboBox.currentText(),
-            speed_profile=self.tc.getSpeedProfileProfile()
+            speed_profile=self.result.velocities
         )
         tv.display()
         self._redraw()
@@ -503,4 +558,3 @@ def main() -> None:
 
 if __name__ == '__main__':
     main()
-

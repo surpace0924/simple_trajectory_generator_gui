@@ -8,9 +8,9 @@ import sys
 import os
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from classes.trajectory_planner import TrajectoryPlanner
-from classes.models import TrajectoryConfig, ViaPoint
-from classes.exceptions import InvalidViaPointError
+from trajectory_generator.core.trajectory_planner import TrajectoryPlanner
+from trajectory_generator.models import TrajectoryConfig, ViaPoint
+from trajectory_generator.exceptions import InvalidViaPointError
 import numpy as np
 
 
@@ -144,14 +144,15 @@ def test_angle_profile():
 
     config = TrajectoryConfig()
 
-    via_points = [
+    # 正の角度のテスト
+    via_points_positive = [
         ViaPoint([0.0, 0.0], angle=0.0, speed=0.0),
         ViaPoint([1.0, 0.0], angle=np.pi/2, speed=0.3),
         ViaPoint([2.0, 0.0], angle=np.pi, speed=0.0)
     ]
 
     planner = TrajectoryPlanner(config)
-    result = planner.plan(via_points)
+    result = planner.plan(via_points_positive)
 
     # 始点と終点の角度をチェック
     start_angle = result.positions[0][2]
@@ -160,7 +161,23 @@ def test_angle_profile():
     assert abs(start_angle - 0.0) < 0.1, f"始点角度が不一致: {start_angle}"
     assert abs(end_angle - np.pi) < 0.1, f"終点角度が不一致: {end_angle}"
 
-    print(f'  ✓ 始点角度{start_angle:.3f}rad, 終点角度{end_angle:.3f}rad')
+    print(f'  ✓ 正の角度: 始点{start_angle:.3f}rad, 終点{end_angle:.3f}rad')
+
+    # 負の角度のテスト
+    via_points_negative = [
+        ViaPoint([0.0, 0.0], angle=0.0, speed=0.0),
+        ViaPoint([1.0, 0.0], angle=-np.pi/4, speed=0.3),
+        ViaPoint([2.0, 0.0], angle=-np.pi/2, speed=0.0)
+    ]
+
+    result_neg = planner.plan(via_points_negative)
+    start_angle_neg = result_neg.positions[0][2]
+    end_angle_neg = result_neg.positions[-1][2]
+
+    assert abs(start_angle_neg - 0.0) < 0.1, f"始点角度が不一致: {start_angle_neg}"
+    assert abs(end_angle_neg - (-np.pi/2)) < 0.1, f"終点角度が不一致: {end_angle_neg}"
+
+    print(f'  ✓ 負の角度: 始点{start_angle_neg:.3f}rad, 終点{end_angle_neg:.3f}rad')
 
 
 def run_all_tests():

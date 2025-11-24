@@ -34,17 +34,6 @@ class CatmullRom:
         """
         self._control_points = [np.array(point[:2]) for point in points]
 
-    def get_result(self) -> Tuple[List[npt.NDArray[np.float64]], float, float]:
-        """計算結果を取得する（レガシーメソッド）
-
-        Returns:
-            結果座標点のリスト、経路長、時刻のタプル
-
-        Note:
-            このメソッドは後方互換性のために残されています。
-        """
-        return self._result_points, self._length, 0.0
-
     def calculate(self, divisions: int) -> Tuple[
         List[npt.NDArray[np.float64]],
         List[float],

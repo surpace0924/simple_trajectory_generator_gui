@@ -295,12 +295,6 @@ class TrajectoryGeneratorGui(QMainWindow, Ui_MainWindow):
         except KeyError as e:
             self._print_log(f"[Warning] 一部のパラメータが見つかりません: {e}")
 
-        # ロボット選択コンボボックスの設定
-        if 'robot' in self.app_param:
-            index = self.comboBox.findText(self.app_param['robot'])
-            if index >= 0:
-                self.comboBox.setCurrentIndex(index)
-
         # tableに経由点データを反映
         if 'table' in self.app_param:
             items = self.app_param['table']
@@ -345,7 +339,6 @@ class TrajectoryGeneratorGui(QMainWindow, Ui_MainWindow):
         self.app_param['linear_tolerance'] = self.lineEdit_8.text()
         self.app_param['angular_tolerance'] = self.lineEdit_9.text()
         self.app_param['disp_period'] = self.lineEdit_04.text()
-        self.app_param['robot'] = self.comboBox.currentText()
 
         # Tableデータの取得（角度は度のまま保存）
         table_val = []
@@ -471,15 +464,24 @@ class TrajectoryGeneratorGui(QMainWindow, Ui_MainWindow):
             self._print_log("[Error] 表示周期または制御周波数の入力値が不正です")
             return
 
-        tv = trajectory_viewer.TrajectoryViewer(
-            poses=self.result.positions,
-            dot_hz=control_frequency,
-            disp_period=disp_period,
-            robot=self.comboBox.currentText(),
-            speed_profile=self.result.velocities
-        )
-        tv.display()
-        self._redraw()
+        # ロボット形状の取得
+        if 'robot_shape' not in self.app_param or not self.app_param['robot_shape']:
+            self._print_log("[Error] ロボット形状が設定されていません。設定JSONに 'robot_shape' フィールドを追加してください。")
+            return
+
+        try:
+            tv = trajectory_viewer.TrajectoryViewer(
+                poses=self.result.positions,
+                dot_hz=control_frequency,
+                disp_period=disp_period,
+                robot=self.app_param['robot_shape'],
+                speed_profile=self.result.velocities
+            )
+            tv.display()
+            self._redraw()
+        except ValueError as e:
+            self._print_log(f"[Error] ロボット形状の読み込みに失敗しました: {e}")
+            return
 
     def _exchange_table_row(self, row1: int, row2: int) -> None:
         """テーブルの2行を入れ替える

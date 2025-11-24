@@ -4,14 +4,13 @@
 使用方法:
     python3 -m tests.test_trajectory_planner
 """
+import numpy as np
+from trajectory_generator.exceptions import InvalidViaPointError
+from trajectory_generator.models import TrajectoryConfig, ViaPoint
+from trajectory_generator.core.trajectory_planner import TrajectoryPlanner
 import sys
 import os
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-
-from trajectory_generator.core.trajectory_planner import TrajectoryPlanner
-from trajectory_generator.models import TrajectoryConfig, ViaPoint
-from trajectory_generator.exceptions import InvalidViaPointError
-import numpy as np
 
 
 def test_basic_planning():
@@ -39,7 +38,7 @@ def test_basic_planning():
     assert len(result.velocities) == result.num_points, "速度データの長さが不一致"
     assert len(result.accelerations) == result.num_points, "加速度データの長さが不一致"
 
-    print(f'  ✓ {result.num_points}点生成, 経路長{result.total_length:.3f}m, 時間{result.total_time:.3f}s')
+    print(f'  [OK] {result.num_points}点生成, 経路長{result.total_length:.3f}m, 時間{result.total_time:.3f}s')
 
 
 def test_straight_line():
@@ -65,7 +64,7 @@ def test_straight_line():
     max_y_deviation = max(abs(p[1]) for p in result.positions)
     assert max_y_deviation < 0.1, f"直線からの逸脱が大きい: {max_y_deviation}"
 
-    print(f'  ✓ 直線経路生成成功, y方向最大偏差{max_y_deviation:.6f}m')
+    print(f'  [OK] 直線経路生成成功, y方向最大偏差{max_y_deviation:.6f}m')
 
 
 def test_constraint_satisfaction():
@@ -97,7 +96,7 @@ def test_constraint_satisfaction():
     assert max_acceleration <= config.max_linear_acceleration * tolerance, \
         f"加速度制約違反: {max_acceleration:.3f} > {config.max_linear_acceleration}"
 
-    print(f'  ✓ 最大速度{max_velocity:.3f}m/s, 最大加速度{max_acceleration:.3f}m/s²')
+    print(f'  [OK] 最大速度{max_velocity:.3f}m/s, 最大加速度{max_acceleration:.3f}m/s²')
 
 
 def test_invalid_via_points():
@@ -112,7 +111,7 @@ def test_invalid_via_points():
         planner.plan([ViaPoint([0.0, 0.0])])
         assert False, "1点のみでエラーが発生しませんでした"
     except InvalidViaPointError:
-        print('  ✓ 1点のみの経由点を正しく検出')
+        print('  [OK] 1点のみの経由点を正しく検出')
 
     # 2点のみ→エラー（Catmull-Romは最低3点必要）
     try:
@@ -123,7 +122,7 @@ def test_invalid_via_points():
         planner.plan(via_points)
         assert False, "2点のみでエラーが発生しませんでした"
     except InvalidViaPointError:
-        print('  ✓ 2点のみの経由点を正しく検出')
+        print('  [OK] 2点のみの経由点を正しく検出')
 
     # 近すぎる経由点→エラー
     try:
@@ -135,7 +134,7 @@ def test_invalid_via_points():
         planner.plan(via_points)
         assert False, "近すぎる経由点でエラーが発生しませんでした"
     except InvalidViaPointError:
-        print('  ✓ 近すぎる経由点を正しく検出')
+        print('  [OK] 近すぎる経由点を正しく検出')
 
 
 def test_angle_profile():
@@ -161,7 +160,7 @@ def test_angle_profile():
     assert abs(start_angle - 0.0) < 0.1, f"始点角度が不一致: {start_angle}"
     assert abs(end_angle - np.pi) < 0.1, f"終点角度が不一致: {end_angle}"
 
-    print(f'  ✓ 正の角度: 始点{start_angle:.3f}rad, 終点{end_angle:.3f}rad')
+    print(f'  [OK] 正の角度: 始点{start_angle:.3f}rad, 終点{end_angle:.3f}rad')
 
     # 負の角度のテスト
     via_points_negative = [
@@ -177,7 +176,7 @@ def test_angle_profile():
     assert abs(start_angle_neg - 0.0) < 0.1, f"始点角度が不一致: {start_angle_neg}"
     assert abs(end_angle_neg - (-np.pi/2)) < 0.1, f"終点角度が不一致: {end_angle_neg}"
 
-    print(f'  ✓ 負の角度: 始点{start_angle_neg:.3f}rad, 終点{end_angle_neg:.3f}rad')
+    print(f'  [OK] 負の角度: 始点{start_angle_neg:.3f}rad, 終点{end_angle_neg:.3f}rad')
 
 
 def run_all_tests():

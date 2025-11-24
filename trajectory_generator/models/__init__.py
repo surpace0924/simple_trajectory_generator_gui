@@ -10,10 +10,16 @@ from trajectory_generator.models.models import (
     TrajectoryResult,
     ViaPointValidator
 )
+from trajectory_generator.models.robot_shape import (
+    RobotShape,
+    get_robot_shape
+)
 
 __all__ = [
     'TrajectoryConfig',
     'ViaPoint',
     'TrajectoryResult',
     'ViaPointValidator',
+    'RobotShape',
+    'get_robot_shape',
 ]

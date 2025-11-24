@@ -19,12 +19,18 @@ class TrajectoryConfig:
         max_linear_jerk: 最大並進躍度 [m/s³]
         max_linear_acceleration: 最大並進加速度 [m/s²]
         max_linear_speed: 最大並進速度 [m/s]
+        max_angular_jerk: 最大回転躍度 [rad/s³]
+        max_angular_acceleration: 最大回転加速度 [rad/s²]
+        max_angular_speed: 最大回転速度 [rad/s]
         control_frequency: 制御周期 [Hz]
         precision: 経路打点間隔 [m]
     """
     max_linear_jerk: float = 5.0
     max_linear_acceleration: float = 1.0
     max_linear_speed: float = 0.5
+    max_angular_jerk: float = 5.0
+    max_angular_acceleration: float = 2.0
+    max_angular_speed: float = 3.0
     control_frequency: int = 100
     precision: float = 0.01
 
@@ -39,11 +45,17 @@ class TrajectoryConfig:
             ValueError: 設定値が不正な場合
         """
         if self.max_linear_jerk <= 0:
-            raise ValueError(f"最大躍度は正の値である必要があります: {self.max_linear_jerk}")
+            raise ValueError(f"最大並進躍度は正の値である必要があります: {self.max_linear_jerk}")
         if self.max_linear_acceleration <= 0:
-            raise ValueError(f"最大加速度は正の値である必要があります: {self.max_linear_acceleration}")
+            raise ValueError(f"最大並進加速度は正の値である必要があります: {self.max_linear_acceleration}")
         if self.max_linear_speed <= 0:
-            raise ValueError(f"最大速度は正の値である必要があります: {self.max_linear_speed}")
+            raise ValueError(f"最大並進速度は正の値である必要があります: {self.max_linear_speed}")
+        if self.max_angular_jerk <= 0:
+            raise ValueError(f"最大回転躍度は正の値である必要があります: {self.max_angular_jerk}")
+        if self.max_angular_acceleration <= 0:
+            raise ValueError(f"最大回転加速度は正の値である必要があります: {self.max_angular_acceleration}")
+        if self.max_angular_speed <= 0:
+            raise ValueError(f"最大回転速度は正の値である必要があります: {self.max_angular_speed}")
         if self.control_frequency <= 0:
             raise ValueError(f"制御周期は正の値である必要があります: {self.control_frequency}")
         if self.precision <= 0:

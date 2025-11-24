@@ -107,10 +107,18 @@ class TrajectoryGeneratorGui(QMainWindow, Ui_MainWindow):
 
         # 制約条件の設定
         try:
+            # 角度の制約条件は度で入力されるのでラジアンに変換
+            max_angular_jerk_deg = float(self.lineEdit_8.text())
+            max_angular_accel_deg = float(self.lineEdit_9.text())
+            max_angular_speed_deg = float(self.lineEdit_10.text())
+
             config = TrajectoryConfig(
                 max_linear_jerk=float(self.lineEdit_01.text()),
                 max_linear_acceleration=float(self.lineEdit_02.text()),
                 max_linear_speed=float(self.lineEdit_03.text()),
+                max_angular_jerk=np.deg2rad(max_angular_jerk_deg),
+                max_angular_acceleration=np.deg2rad(max_angular_accel_deg),
+                max_angular_speed=np.deg2rad(max_angular_speed_deg),
                 control_frequency=int(self.lineEdit_07.text()),
                 precision=float(self.lineEdit_08.text())
             )
@@ -282,6 +290,9 @@ class TrajectoryGeneratorGui(QMainWindow, Ui_MainWindow):
         self.app_param['max_linear_jerk'] = self.lineEdit_01.text()
         self.app_param['max_linear_acceleration'] = self.lineEdit_02.text()
         self.app_param['max_linear_speed'] = self.lineEdit_03.text()
+        self.app_param['max_angular_jerk'] = self.lineEdit_8.text()
+        self.app_param['max_angular_acceleration'] = self.lineEdit_9.text()
+        self.app_param['max_angular_speed'] = self.lineEdit_10.text()
         self.app_param['hz'] = self.lineEdit_07.text()
         self.app_param['precision'] = self.lineEdit_08.text()
         self.app_param['disp_period'] = self.lineEdit_04.text()
@@ -522,12 +533,15 @@ class TrajectoryGeneratorGui(QMainWindow, Ui_MainWindow):
         # 各lineEditに反映
         try:
             self.lineEdit_00.setText(fname)
-            self.lineEdit_01.setText(self.app_param['max_linear_jerk'])
-            self.lineEdit_02.setText(self.app_param['max_linear_acceleration'])
-            self.lineEdit_03.setText(self.app_param['max_linear_speed'])
-            self.lineEdit_07.setText(self.app_param['hz'])
-            self.lineEdit_08.setText(self.app_param['precision'])
-            self.lineEdit_04.setText(self.app_param['disp_period'])
+            self.lineEdit_01.setText(self.app_param.get('max_linear_jerk', '5.0'))
+            self.lineEdit_02.setText(self.app_param.get('max_linear_acceleration', '2.0'))
+            self.lineEdit_03.setText(self.app_param.get('max_linear_speed', '2.0'))
+            self.lineEdit_8.setText(self.app_param.get('max_angular_jerk', '100.0'))
+            self.lineEdit_9.setText(self.app_param.get('max_angular_acceleration', '50.0'))
+            self.lineEdit_10.setText(self.app_param.get('max_angular_speed', '50.0'))
+            self.lineEdit_07.setText(self.app_param.get('hz', '100'))
+            self.lineEdit_08.setText(self.app_param.get('precision', '0.01'))
+            self.lineEdit_04.setText(self.app_param.get('disp_period', '0.5'))
         except KeyError as e:
             self._print_log(f"[Warning] 一部のパラメータが見つかりません: {e}")
 

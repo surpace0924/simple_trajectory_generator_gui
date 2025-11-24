@@ -272,10 +272,9 @@ class TrajectoryPlanner:
         angular_velocities_list = []
 
         # 角速度制約（角度用の制約を設定）
-        # 線形速度の制約を角速度に適用（rad/s）
-        max_angular_jerk = self.config.max_linear_jerk  # [rad/s³]
-        max_angular_accel = self.config.max_linear_acceleration  # [rad/s²]
-        max_angular_speed = self.config.max_linear_speed  # [rad/s]
+        max_angular_jerk = self.config.max_angular_jerk  # [rad/s³]
+        max_angular_accel = self.config.max_angular_acceleration  # [rad/s²]
+        max_angular_speed = self.config.max_angular_speed  # [rad/s]
 
         # 累積角度の初期値（開始角度）
         cumulative_angle = angle_via_values[0]

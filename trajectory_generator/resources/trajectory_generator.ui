@@ -568,26 +568,6 @@
     <property name="title">
      <string>結果表示設定</string>
     </property>
-    <widget class="QComboBox" name="comboBox">
-     <property name="geometry">
-      <rect>
-       <x>140</x>
-       <y>31</y>
-       <width>131</width>
-       <height>21</height>
-      </rect>
-     </property>
-     <item>
-      <property name="text">
-       <string>TR</string>
-      </property>
-     </item>
-     <item>
-      <property name="text">
-       <string>DR</string>
-      </property>
-     </item>
-    </widget>
     <widget class="QLabel" name="label_8">
      <property name="geometry">
       <rect>
@@ -657,6 +637,19 @@
      </property>
      <property name="default">
       <bool>false</bool>
+     </property>
+    </widget>
+    <widget class="QLabel" name="label_19">
+     <property name="geometry">
+      <rect>
+       <x>140</x>
+       <y>30</y>
+       <width>131</width>
+       <height>20</height>
+      </rect>
+     </property>
+     <property name="text">
+      <string/>
      </property>
     </widget>
    </widget>

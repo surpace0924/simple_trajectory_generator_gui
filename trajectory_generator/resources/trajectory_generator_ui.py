@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-# Form implementation generated from reading ui file 'trajectory_generator.ui'
+# Form implementation generated from reading ui file 'trajectory_generator/resources/trajectory_generator.ui'
 #
 # Created by: PyQt5 UI code generator 5.15.11
 #
@@ -156,11 +156,6 @@ class Ui_MainWindow(object):
         self.groupBox_5 = QtWidgets.QGroupBox(self.centralwidget)
         self.groupBox_5.setGeometry(QtCore.QRect(930, 290, 281, 151))
         self.groupBox_5.setObjectName("groupBox_5")
-        self.comboBox = QtWidgets.QComboBox(self.groupBox_5)
-        self.comboBox.setGeometry(QtCore.QRect(140, 31, 131, 21))
-        self.comboBox.setObjectName("comboBox")
-        self.comboBox.addItem("")
-        self.comboBox.addItem("")
         self.label_8 = QtWidgets.QLabel(self.groupBox_5)
         self.label_8.setGeometry(QtCore.QRect(20, 30, 111, 16))
         self.label_8.setObjectName("label_8")
@@ -178,6 +173,10 @@ class Ui_MainWindow(object):
         self.pushButton_9.setGeometry(QtCore.QRect(10, 100, 261, 41))
         self.pushButton_9.setDefault(False)
         self.pushButton_9.setObjectName("pushButton_9")
+        self.label_19 = QtWidgets.QLabel(self.groupBox_5)
+        self.label_19.setGeometry(QtCore.QRect(140, 30, 131, 20))
+        self.label_19.setText("")
+        self.label_19.setObjectName("label_19")
         self.pushButton_16 = QtWidgets.QPushButton(self.centralwidget)
         self.pushButton_16.setGeometry(QtCore.QRect(840, 570, 151, 41))
         self.pushButton_16.setObjectName("pushButton_16")
@@ -259,8 +258,6 @@ class Ui_MainWindow(object):
         self.label_11.setText(_translate("MainWindow", "並進収束誤差"))
         self.label_12.setText(_translate("MainWindow", "m"))
         self.groupBox_5.setTitle(_translate("MainWindow", "結果表示設定"))
-        self.comboBox.setItemText(0, _translate("MainWindow", "TR"))
-        self.comboBox.setItemText(1, _translate("MainWindow", "DR"))
         self.label_8.setText(_translate("MainWindow", "ロボット種別"))
         self.label_18.setText(_translate("MainWindow", "s"))
         self.lineEdit_04.setText(_translate("MainWindow", "1"))

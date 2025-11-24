@@ -295,6 +295,13 @@ class TrajectoryGeneratorGui(QMainWindow, Ui_MainWindow):
         except KeyError as e:
             self._print_log(f"[Warning] 一部のパラメータが見つかりません: {e}")
 
+        # ロボット形状の名前をlabel_19に表示
+        if 'robot_shape' in self.app_param and self.app_param['robot_shape']:
+            robot_name = self.app_param['robot_shape'].get('name', '未設定')
+            self.label_19.setText(robot_name)
+        else:
+            self.label_19.setText('未設定')
+
         # tableに経由点データを反映
         if 'table' in self.app_param:
             items = self.app_param['table']

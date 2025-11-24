@@ -4,8 +4,8 @@
 UIファイルなどのリソースを提供します。
 """
 
-from trajectory_generator.resources.trajectory_generator_ui import Ui_MainWindow
+from trajectory_generator.resources.trajectory_generator_ui import Ui_SimpleTrajectoryGenerator
 
 __all__ = [
-    'Ui_MainWindow',
+    'Ui_SimpleTrajectoryGenerator',
 ]

@@ -9,6 +9,7 @@ import numpy as np
 
 from trajectory_generator.core.catmull_rom import CatmullRom
 from trajectory_generator.core.speed_profile import SpeedProfile
+from trajectory_generator.core.minimum_jerk import MinimumJerkTrajectory
 from trajectory_generator.models import TrajectoryConfig, ViaPoint, TrajectoryResult, ViaPointValidator
 from trajectory_generator.exceptions import InvalidViaPointError, CalculationError
 
@@ -226,7 +227,7 @@ class TrajectoryPlanner:
         trajectory: List,
         timestamps: List[float]
     ) -> tuple:
-        """角度プロファイルの計算（SpeedProfile使用）
+        """角度プロファイルの計算（躍度最小モデル使用）
 
         Args:
             via_points: 経由点のリスト
@@ -266,23 +267,17 @@ class TrajectoryPlanner:
             angle_diff = np.arctan2(np.sin(angle_diff), np.cos(angle_diff))
             angle_sections.append(angle_diff)
 
-        # SpeedProfileで角度プロファイルを生成
+        # 躍度最小モデルで角度プロファイルを生成
         angle_timestamps = []
         angles_list_cumulative = []  # 累積角度（アンラップ状態）
         angular_velocities_list = []
 
-        # 角速度制約（角度用の制約を設定）
-        max_angular_jerk = self.config.max_angular_jerk  # [rad/s³]
-        max_angular_accel = self.config.max_angular_acceleration  # [rad/s²]
-        max_angular_speed = self.config.max_angular_speed  # [rad/s]
-
         # 累積角度の初期値（開始角度）
         cumulative_angle = angle_via_values[0]
 
-        sp_angle = SpeedProfile()
-
+        # 各区間について躍度最小軌道を生成
         for i, angle_section in enumerate(angle_sections):
-            # 実際の軌跡における区間の時間
+            # 実際の軌跡における区間の時間（並進の結果から取得）
             section_start_time = angle_via_times[i]
             section_end_time = angle_via_times[i + 1]
             section_duration = section_end_time - section_start_time
@@ -290,42 +285,27 @@ class TrajectoryPlanner:
             # この区間の開始累積角度を記録
             section_start_angle = cumulative_angle
 
-            t0 = sp_angle.t_end()
-            sp_angle.reset(
-                j_max=max_angular_jerk,
-                a_max=max_angular_accel,
-                v_sat=max_angular_speed,
-                v_start=0.0,  # 各区間の始点・終点で角速度ゼロ
-                v_target=0.0,
-                dist=angle_section,  # 角度差
-                x_start=sp_angle.x_end(),
-                t_start=sp_angle.t_end()
+            # 時間固定の躍度最小軌道を生成
+            mjt = MinimumJerkTrajectory(
+                distance=angle_section,
+                duration=section_duration,
+                t_start=section_start_time
             )
 
-            # SpeedProfileが生成した実際の所要時間
-            sp_duration = sp_angle.t_end() - t0
-
-            # 軌跡の実時間に合わせてサンプリング
+            # 並進の軌跡の実時間に合わせてサンプリング
             num_samples = int(section_duration * self.config.control_frequency)
             for j in range(num_samples):
-                # 実際の時刻
+                # 並進の実時刻
                 actual_t = section_start_time + j / self.config.control_frequency
 
-                # SpeedProfile内での時刻（実時間に対する正規化比率でスケーリング）
-                # 軌跡の実時間をSpeedProfileの時間にマッピング
-                time_ratio = (actual_t - section_start_time) / section_duration
-                sp_t = t0 + time_ratio * sp_duration
-
-                # この区間内の相対角度変化を取得
-                relative_angle = sp_angle.x(sp_t) - sp_angle.x(t0)
+                # 躍度最小モデルから位置と速度を取得
+                relative_angle = mjt.position(actual_t)
+                angular_velocity = mjt.velocity(actual_t)
 
                 angle_timestamps.append(actual_t)
                 # 累積角度 = 区間開始角度 + 区間内の変化
                 angles_list_cumulative.append(section_start_angle + relative_angle)
-
-                # 角速度も時間スケーリングに応じて調整
-                # v_actual = v_sp * (sp_duration / section_duration)
-                angular_velocities_list.append(sp_angle.v(sp_t) * (sp_duration / section_duration))
+                angular_velocities_list.append(angular_velocity)
 
             # 次の区間のために累積角度を更新
             cumulative_angle = section_start_angle + angle_section

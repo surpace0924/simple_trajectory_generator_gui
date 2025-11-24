@@ -85,6 +85,13 @@ class TrajectoryGeneratorGui(QMainWindow, Ui_MainWindow):
         self.use_via_angle: List[bool] = []  # 経由点の角度制約を使用するか
         self.use_via_speed: List[bool] = []  # 経由点の速度制約を使用するか
 
+        # 前回使用した設定ファイルのパスを保存するファイル（リポジトリ内）
+        script_dir = os.path.dirname(os.path.abspath(__file__))
+        self.last_config_file = os.path.join(script_dir, '.last_config.json')
+
+        # 起動時に前回の設定ファイルを読み込む
+        self._load_last_settings()
+
     @pyqtSlot()
     def button_generate_Click(self) -> None:
         """経路生成ボタンのクリックイベントハンドラ
@@ -274,60 +281,7 @@ class TrajectoryGeneratorGui(QMainWindow, Ui_MainWindow):
         if not fname:
             return
 
-        try:
-            with open(fname, 'r', encoding='utf-8') as f:
-                self.app_param = json.load(f)
-        except (IOError, json.JSONDecodeError) as e:
-            self._print_log(f"[Error] 設定ファイルの読み込みに失敗しました: {e}")
-            return
-
-        # 各lineEditに反映
-        try:
-            self.lineEdit_00.setText(fname)
-            self.lineEdit_01.setText(self.app_param['max_linear_jerk'])
-            self.lineEdit_02.setText(self.app_param['max_linear_acceleration'])
-            self.lineEdit_03.setText(self.app_param['max_linear_speed'])
-            self.lineEdit_07.setText(self.app_param['hz'])
-            self.lineEdit_08.setText(self.app_param['precision'])
-            self.lineEdit_04.setText(self.app_param['disp_period'])
-            self.lineEdit_8.setText(self.app_param['linear_tolerance'])
-            self.lineEdit_9.setText(self.app_param['angular_tolerance'])
-        except KeyError as e:
-            self._print_log(f"[Warning] 一部のパラメータが見つかりません: {e}")
-
-        # ロボット形状の名前をlabel_19に表示
-        if 'robot_shape' in self.app_param and self.app_param['robot_shape']:
-            robot_name = self.app_param['robot_shape'].get('name', '未設定')
-            self.label_19.setText(robot_name)
-        else:
-            self.label_19.setText('未設定')
-
-        # tableに経由点データを反映
-        if 'table' in self.app_param:
-            items = self.app_param['table']
-            self.tableWidget.clearContents()
-            self.tableWidget.setRowCount(len(items))
-
-            for r, item in enumerate(items):
-                for c in range(len(item)):
-                    value = item[c]
-                    # 角度列(c=2)の場合、既存JSONとの互換性のため自動判定
-                    if c == COLUMN_INDEX_ANGLE and value:
-                        try:
-                            value_num = float(value)
-                            # -π〜πの範囲ならラジアンと判定して度に変換
-                            # それ以外は既に度と判定してそのまま使用
-                            if -np.pi <= value_num <= np.pi and abs(value_num) < 10:
-                                # ラジアン値として度に変換
-                                value = f"{np.rad2deg(value_num):.3f}"
-                            else:
-                                # 既に度の値としてそのまま使用
-                                value = str(value)
-                        except (ValueError, TypeError):
-                            pass  # 変換失敗時はそのまま使用
-                    self.tableWidget.setItem(r, c, QTableWidgetItem(str(value)))
-
-        self._redraw()
+        self._load_settings_from_file(fname)
 
     @pyqtSlot()
     def button_export_settingfile(self) -> None:
@@ -563,6 +517,101 @@ class TrajectoryGeneratorGui(QMainWindow, Ui_MainWindow):
                 f.write(text)
         except IOError as e:
             self._print_log(f"[Error] ファイルの保存に失敗しました: {e}")
+
+    def _load_settings_from_file(self, fname: str) -> None:
+        """設定ファイルを読み込んでGUIに反映
+
+        Args:
+            fname: 設定ファイルのパス
+        """
+        try:
+            with open(fname, 'r', encoding='utf-8') as f:
+                self.app_param = json.load(f)
+        except (IOError, json.JSONDecodeError) as e:
+            self._print_log(f"[Error] 設定ファイルの読み込みに失敗しました: {e}")
+            return
+
+        # 前回使用したファイルパスを保存
+        self._save_last_config_path(fname)
+
+        # 各lineEditに反映
+        try:
+            self.lineEdit_00.setText(fname)
+            self.lineEdit_01.setText(self.app_param['max_linear_jerk'])
+            self.lineEdit_02.setText(self.app_param['max_linear_acceleration'])
+            self.lineEdit_03.setText(self.app_param['max_linear_speed'])
+            self.lineEdit_07.setText(self.app_param['hz'])
+            self.lineEdit_08.setText(self.app_param['precision'])
+            self.lineEdit_04.setText(self.app_param['disp_period'])
+            self.lineEdit_8.setText(self.app_param['linear_tolerance'])
+            self.lineEdit_9.setText(self.app_param['angular_tolerance'])
+        except KeyError as e:
+            self._print_log(f"[Warning] 一部のパラメータが見つかりません: {e}")
+
+        # ロボット形状の名前をlabel_19に表示
+        if 'robot_shape' in self.app_param and self.app_param['robot_shape']:
+            robot_name = self.app_param['robot_shape'].get('name', '未設定')
+            self.label_19.setText(robot_name)
+        else:
+            self.label_19.setText('未設定')
+
+        # tableに経由点データを反映
+        if 'table' in self.app_param:
+            items = self.app_param['table']
+            self.tableWidget.clearContents()
+            self.tableWidget.setRowCount(len(items))
+
+            for r, item in enumerate(items):
+                for c in range(len(item)):
+                    value = item[c]
+                    # 角度列(c=2)の場合、既存JSONとの互換性のため自動判定
+                    if c == COLUMN_INDEX_ANGLE and value:
+                        try:
+                            value_num = float(value)
+                            # -π〜πの範囲ならラジアンと判定して度に変換
+                            # それ以外は既に度と判定してそのまま使用
+                            if -np.pi <= value_num <= np.pi and abs(value_num) < 10:
+                                # ラジアン値として度に変換
+                                value = f"{np.rad2deg(value_num):.3f}"
+                            else:
+                                # 既に度の値としてそのまま使用
+                                value = str(value)
+                        except (ValueError, TypeError):
+                            pass  # 変換失敗時はそのまま使用
+                    self.tableWidget.setItem(r, c, QTableWidgetItem(str(value)))
+
+        self._redraw()
+
+    def _save_last_config_path(self, path: str) -> None:
+        """前回使用した設定ファイルのパスを保存
+
+        Args:
+            path: 保存する設定ファイルのパス
+        """
+        try:
+            with open(self.last_config_file, 'w', encoding='utf-8') as f:
+                json.dump({'last_config_path': path}, f, ensure_ascii=False)
+        except IOError:
+            # 保存に失敗しても処理は継続
+            pass
+
+    def _load_last_settings(self) -> None:
+        """起動時に前回使用した設定ファイルを読み込む"""
+        # 前回の設定ファイルパスを取得
+        if not os.path.exists(self.last_config_file):
+            return
+
+        try:
+            with open(self.last_config_file, 'r', encoding='utf-8') as f:
+                data = json.load(f)
+                last_path = data.get('last_config_path')
+
+            if last_path and os.path.exists(last_path):
+                self._load_settings_from_file(last_path)
+                self._print_log(f"[Info] 前回の設定ファイルを読み込みました: {last_path}")
+        except (IOError, json.JSONDecodeError, KeyError):
+            # 読み込みに失敗しても処理は継続
+            pass
 
 
 def main() -> None:

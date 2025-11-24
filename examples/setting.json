@@ -5,8 +5,6 @@
     "hz": "100",
     "precision": "0.01",
     "disp_period": "0.5",
-    "linear_tolerance": "0.01",
-    "angular_tolerance": "0.02",
     "robot_shape": {
         "name": "TR",
         "vertices": [

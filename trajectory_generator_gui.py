@@ -202,27 +202,14 @@ class TrajectoryGeneratorGui(QMainWindow, Ui_MainWindow):
         if not fname:
             return
 
-        # 最大角速度の計算
-        max_angular_speed = np.max(np.abs(self.result.angular_velocities))
-        if max_angular_speed < 1.0:
-            max_angular_speed = 1.0
-
-        # ヘッダー行の生成（CSV形式）
-        header = (
-            f"{self.lineEdit_8.text()},"
-            f"{self.lineEdit_9.text()},"
-            f"{np.max(self.result.velocities)},"
-            f"{max_angular_speed}\n"
-        )
-
-        # 経路データの生成
+        # 経路データの生成（ヘッダーなし）
         trajectory_lines = [
             f"{point[0]},{point[1]},{point[2]}\n"
             for point in self.result.positions
         ]
 
         # ファイルに書き込み
-        write_text = header + ''.join(trajectory_lines)
+        write_text = ''.join(trajectory_lines)
         self._save_file(fname, write_text)
         self._redraw()
 
@@ -297,8 +284,6 @@ class TrajectoryGeneratorGui(QMainWindow, Ui_MainWindow):
         self.app_param['max_linear_speed'] = self.lineEdit_03.text()
         self.app_param['hz'] = self.lineEdit_07.text()
         self.app_param['precision'] = self.lineEdit_08.text()
-        self.app_param['linear_tolerance'] = self.lineEdit_8.text()
-        self.app_param['angular_tolerance'] = self.lineEdit_9.text()
         self.app_param['disp_period'] = self.lineEdit_04.text()
 
         # Tableデータの取得（角度は度のまま保存）
@@ -543,8 +528,6 @@ class TrajectoryGeneratorGui(QMainWindow, Ui_MainWindow):
             self.lineEdit_07.setText(self.app_param['hz'])
             self.lineEdit_08.setText(self.app_param['precision'])
             self.lineEdit_04.setText(self.app_param['disp_period'])
-            self.lineEdit_8.setText(self.app_param['linear_tolerance'])
-            self.lineEdit_9.setText(self.app_param['angular_tolerance'])
         except KeyError as e:
             self._print_log(f"[Warning] 一部のパラメータが見つかりません: {e}")
 

@@ -13,7 +13,7 @@ class AccelCurve:
 
     引数の制約条件に従って加速曲線を生成します。
     - 始点速度と終点速度を滑らかにつなぐ
-    - 移動距離の拘束はない
+    - 移動距離の制約はない
     - 始点速度および終点速度は、正でも負でも可
 
     Attributes:
@@ -63,7 +63,7 @@ class AccelCurve:
         v_start: float,
         v_end: float
     ) -> None:
-        """引数の拘束条件から曲線を生成する
+        """引数の制約条件から曲線を生成する
 
         Args:
             j_max: 最大躍度の大きさ [m/s³], 正であること
@@ -326,7 +326,7 @@ class AccelCurve:
         )
 
         if discriminant < 0:
-            # 拘束条件がおかしい
+            # 制約条件がおかしい
             print(f"[Error] Discriminant = {discriminant} < 0")
 
             # 入力のチェック
@@ -379,12 +379,12 @@ class AccelCurve:
 
 
 class SpeedProfile:
-    """拘束条件を満たす曲線加減速の軌道を生成するクラス
+    """制約条件を満たす曲線加減速の軌道を生成するクラス
 
-    移動距離の拘束条件を満たす曲線加速軌道を生成します。
+    移動距離の制約条件を満たす曲線加速軌道を生成します。
     各時刻tにおける躍度j(t)、加速度a(t)、速度v(t)、位置x(t)を提供します。
 
-    注意: 最大加速度a_maxと始点速度v_startなど拘束次第では
+    注意: 最大加速度a_maxと始点速度v_startなど制約次第では
     目標速度に達することができない場合があります。
 
     Attributes:
@@ -441,7 +441,7 @@ class SpeedProfile:
         x_start: float = 0.0,
         t_start: float = 0.0
     ) -> None:
-        """引数の拘束条件から曲線を生成する
+        """引数の制約条件から曲線を生成する
 
         この関数によって、すべての変数が初期化されます。
 
@@ -466,19 +466,17 @@ class SpeedProfile:
         dist_min = AccelCurve.calc_min_distance(j_max, a_max, v_start, v_end)
 
         if abs(dist) < abs(dist_min):
-            print("[Info] 走行距離の拘束を満たすため、最大速度まで加速できません")
             # 目標速度v_tに向かい、走行距離dで到達し得る終点速度v_eを算出
             v_end = AccelCurve.calc_velocity_end(j_max, a_max, v_start, v_target, dist)
-            v_max = v_end  # 走行距離の拘束を満たすため、飽和速度まで加速できない
+            v_max = v_end  # 走行距離の制約を満たすため、飽和速度まで加速できない
 
         # 曲線を生成
         self.ac.reset(j_max, a_max, v_start, v_max)  # 加速
         self.dc.reset(j_max, a_max, v_max, v_end)  # 減速
 
-        # 飽和速度まで加速すると走行距離の拘束を満たさない場合の処理
+        # 飽和速度まで加速すると走行距離の制約を満たさない場合の処理
         d_sum = self.ac.x_end() + self.dc.x_end()
         if abs(dist) < abs(d_sum):
-            print("走行距離の拘束を満たすため、最大速度まで加速できません")
             # 走行距離から最大速度v_mを算出 下記v_maxは上記v_max以下になる
             v_max = AccelCurve.calc_velocity_max(j_max, a_max, v_start, v_end, dist)
 

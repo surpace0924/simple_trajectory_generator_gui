@@ -1,8 +1,8 @@
 # -*- coding: utf-8 -*-
 
 import os
-from PyQt5.QtWidgets import QSizePolicy, QTableWidgetItem
-from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
+from PySide6.QtWidgets import QSizePolicy, QTableWidgetItem
+from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.figure import Figure
 import matplotlib.pyplot as plt
 import numpy as np

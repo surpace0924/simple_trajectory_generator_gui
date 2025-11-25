@@ -11,8 +11,8 @@ import datetime
 from typing import List, Dict, Any, Optional
 
 import numpy as np
-from PyQt5.QtCore import pyqtSlot
-from PyQt5.QtWidgets import (
+from PySide6.QtCore import Slot
+from PySide6.QtWidgets import (
     QApplication,
     QMainWindow,
     QTableWidgetItem,
@@ -98,7 +98,7 @@ class TrajectoryGeneratorGui(QMainWindow, Ui_SimpleTrajectoryGenerator):
         # 起動時に前回の設定ファイルを読み込む
         self._load_last_settings()
 
-    @pyqtSlot()
+    @Slot()
     def button_generate_Click(self) -> None:
         """経路生成ボタンのクリックイベントハンドラ
 
@@ -176,7 +176,7 @@ class TrajectoryGeneratorGui(QMainWindow, Ui_SimpleTrajectoryGenerator):
     def _redraw(self) -> None:
         """ウィンドウを再描画する
 
-        PyQt5の描画更新を強制するためのハック。
+        PySide6の描画更新を強制するためのハック。
         ウィンドウサイズを1px変更して元に戻すことで再描画を促す。
         """
         self.resize(self.width(), self.height() + 1)
@@ -192,7 +192,7 @@ class TrajectoryGeneratorGui(QMainWindow, Ui_SimpleTrajectoryGenerator):
         self.textBrowser.append(f"----- {datetime.datetime.now()} -----")
         self.textBrowser.append(text)
 
-    @pyqtSlot()
+    @Slot()
     def button_export_Click(self) -> None:
         """経路データをCSVファイルにエクスポート"""
         if self.result is None:
@@ -219,21 +219,21 @@ class TrajectoryGeneratorGui(QMainWindow, Ui_SimpleTrajectoryGenerator):
         self._save_file(fname, write_text)
         self._redraw()
 
-    @pyqtSlot()
+    @Slot()
     def button_cell_up_Click(self) -> None:
         """テーブルの選択行を1つ上に移動"""
         current_row = self.tableWidget.currentRow()
         self._exchange_table_row(current_row - 1, current_row)
         self._redraw()
 
-    @pyqtSlot()
+    @Slot()
     def button_cell_down_Click(self) -> None:
         """テーブルの選択行を1つ下に移動"""
         current_row = self.tableWidget.currentRow()
         self._exchange_table_row(current_row + 1, current_row)
         self._redraw()
 
-    @pyqtSlot()
+    @Slot()
     def cell_changed(self) -> None:
         """テーブルの内容が変更されたときのイベントハンドラ"""
         # tableの値をリストに書き込む
@@ -242,12 +242,12 @@ class TrajectoryGeneratorGui(QMainWindow, Ui_SimpleTrajectoryGenerator):
         # 制御点を再描画
         self.canvas.drawControlPoint(self.via_points)
 
-    @pyqtSlot()
+    @Slot()
     def button_cell_add_Click(self) -> None:
         """経由点を追加"""
         self._redraw()
 
-    @pyqtSlot()
+    @Slot()
     def button_cell_delete_Click(self) -> None:
         """選択された経由点を削除"""
         # 削除する行の特定
@@ -263,7 +263,7 @@ class TrajectoryGeneratorGui(QMainWindow, Ui_SimpleTrajectoryGenerator):
         self.canvas.drawControlPoint(self.via_points)
         self._redraw()
 
-    @pyqtSlot()
+    @Slot()
     def button_select_settingfile(self) -> None:
         """設定ファイルを読み込んでGUIに反映"""
         fname, _ = QFileDialog.getOpenFileName(
@@ -276,7 +276,7 @@ class TrajectoryGeneratorGui(QMainWindow, Ui_SimpleTrajectoryGenerator):
 
         self._load_settings_from_file(fname)
 
-    @pyqtSlot()
+    @Slot()
     def button_export_settingfile(self) -> None:
         """現在の設定をJSONファイルにエクスポート
 
@@ -316,12 +316,12 @@ class TrajectoryGeneratorGui(QMainWindow, Ui_SimpleTrajectoryGenerator):
         self._save_file(fname, write_text)
         self._redraw()
 
-    @pyqtSlot()
+    @Slot()
     def button_open_map(self) -> None:
         """マップを開く"""
         self._redraw()
 
-    @pyqtSlot()
+    @Slot()
     def button_adjust_origin(self) -> None:
         """原点位置を調整"""
         try:
@@ -334,7 +334,7 @@ class TrajectoryGeneratorGui(QMainWindow, Ui_SimpleTrajectoryGenerator):
         except ValueError:
             self._print_log("[Error] 原点座標の入力値が不正です")
 
-    @pyqtSlot()
+    @Slot()
     def button_curvature_check(self) -> None:
         """曲率プロファイルを表示"""
         if self.result is None:
@@ -348,7 +348,7 @@ class TrajectoryGeneratorGui(QMainWindow, Ui_SimpleTrajectoryGenerator):
         )
         self._redraw()
 
-    @pyqtSlot()
+    @Slot()
     def button_speed_check(self) -> None:
         """速度プロファイルを表示"""
         if self.result is None:
@@ -362,7 +362,7 @@ class TrajectoryGeneratorGui(QMainWindow, Ui_SimpleTrajectoryGenerator):
         )
         self._redraw()
 
-    @pyqtSlot()
+    @Slot()
     def button_angular_speed_check(self) -> None:
         """角速度プロファイルを表示"""
         if self.result is None:
@@ -376,7 +376,7 @@ class TrajectoryGeneratorGui(QMainWindow, Ui_SimpleTrajectoryGenerator):
         )
         self._redraw()
 
-    @pyqtSlot()
+    @Slot()
     def button_acceleration_check(self) -> None:
         """加速度プロファイルを表示"""
         if self.result is None:
@@ -390,7 +390,7 @@ class TrajectoryGeneratorGui(QMainWindow, Ui_SimpleTrajectoryGenerator):
         )
         self._redraw()
 
-    @pyqtSlot()
+    @Slot()
     def button_angle_check(self) -> None:
         """角度プロファイルを表示"""
         if self.result is None:
@@ -402,7 +402,7 @@ class TrajectoryGeneratorGui(QMainWindow, Ui_SimpleTrajectoryGenerator):
         gv.displayAngleProfile(self.result.timestamps, angles)
         self._redraw()
 
-    @pyqtSlot()
+    @Slot()
     def button_view_result(self) -> None:
         """経路のアニメーション表示"""
         if self.result is None:

@@ -6,6 +6,8 @@ import matplotlib.patches as patches
 import colorsys
 from typing import Optional, Union
 from trajectory_generator.models.robot_shape import RobotShape, get_robot_shape
+from trajectory_generator.models.map_elements import MapData
+from trajectory_generator.gui.map_renderer import MapRenderer
 
 class TrajectoryViewer:
     def __init__(
@@ -14,7 +16,8 @@ class TrajectoryViewer:
         dot_hz,
         disp_period,
         robot: Optional[Union[dict, RobotShape]] = None,
-        speed_profile = None
+        speed_profile = None,
+        map_data: Optional[MapData] = None
     ):
         """軌跡の可視化クラス
 
@@ -26,11 +29,14 @@ class TrajectoryViewer:
                    - 形状定義辞書 (dict) {"name": "...", "vertices": [...]}
                    - RobotShapeインスタンス
             speed_profile: 速度プロファイル
+            map_data: マップデータ（オプション）
         """
         self.poses = poses
         self.dot_hz = dot_hz
         self.disp_period = disp_period
         self.speed_profile = speed_profile
+        self.map_data = map_data
+        self.map_renderer = MapRenderer() if map_data else None
 
         # RobotShape インスタンスを取得
         if robot is None:
@@ -86,10 +92,12 @@ class TrajectoryViewer:
 
         return plt.Polygon((point[0], point[1], point[2], point[3]), ec=ec, fc=fc, fill=fill)
 
-    def display(self):
-        fig = plt.figure()
-        ax = plt.axes()
+    def _draw_default_field(self, ax):
+        """デフォルトのフィールド構造物を描画
 
+        Args:
+            ax: matplotlib axis
+        """
         # フィールド構造物の描画
         field = []
         field.append(plt.Polygon(((+3.450, -5.950),
@@ -126,6 +134,16 @@ class TrajectoryViewer:
         ax.plot([-2.45, -3.45], [-5.45, -5.45], "black", linewidth = 1)
         ax.plot([-2.45, -2.45], [-5.45, -5.95], "black", linewidth = 1)
         ax.plot([-2.45, -3.45], [-5.63, -5.63], "black", linewidth = 1)
+
+    def display(self):
+        fig = plt.figure()
+        ax = plt.axes()
+
+        # マップデータがあればマップを描画、なければデフォルトのフィールド構造物を描画
+        if self.map_data and self.map_renderer:
+            self.map_renderer.render(ax, self.map_data)
+        else:
+            self._draw_default_field(ax)
 
         # 速度に応じて打点色を変える
         color_list = []

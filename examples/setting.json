@@ -41,6 +41,117 @@
         -0.062
       ]
     ]
+  },  
+  "map": {
+    "name": "NHK2021",
+    "scale": 1.0,
+    "origin": [0.0, 0.0],
+    "background_color": "#FFFFFF",
+    "elements": [
+      {
+        "type": "line",
+        "points": [
+          [5.950, -5.950],
+          [5.950, -0.025],
+          [4.000, -0.025],
+          [4.000, -2.000],
+          [2.000, -4.000],
+          [-0.025, -4.000],
+          [-0.025, 3.950],
+          [-1.979, 3.950],
+          [-3.950, 1.979],
+          [-3.950, -1.979],
+          [-1.979, -3.950],
+          [-1.025, -3.950],
+          [-1.025, -4.000],
+          [-2.000, -4.000],
+          [-4.000, -2.000],
+          [-4.000, -0.025],
+          [-5.950, -0.025],
+          [-5.950, -5.950],
+          [5.950, -5.950]],
+        "width": 0.1,
+        "color": "#000000",
+        "style": "solid",
+        "alpha": 1.0,
+        "z_order": 2,
+        "label": "Field Border"
+      },
+      {
+        "type": "rectangle",
+        "position": [-0.575,2.335],
+        "width": 1.150,
+        "height": 0.330,
+        "color": "#000000",
+        "style": "solid",
+        "alpha": 1,
+        "z_order": 2,
+        "label": "Table0"
+      },
+      {
+        "type": "rectangle",
+        "position": [-0.575,-0.165],
+        "width": 1.150,
+        "height": 0.330,
+        "color": "#000000",
+        "style": "solid",
+        "alpha": 1,
+        "z_order": 2,
+        "label": "Table1"
+      },
+      {
+        "type": "rectangle",
+        "position": [-0.575,-2.665],
+        "width": 1.150,
+        "height": 0.330,
+        "color": "#000000",
+        "style": "solid",
+        "alpha": 1,
+        "z_order": 2,
+        "label": "Table2"
+      },
+      {
+        "type": "circle",
+        "center": [-2, 0.28],
+        "radius": 0.46,
+        "color": "#000000",
+        "style": "solid",
+        "alpha": 1,
+        "label": "Table3"
+      },
+      {
+        "type": "circle",
+        "center": [-2, -0.28],
+        "radius": 0.46,
+        "color": "#000000",
+        "style": "solid",
+        "alpha": 1,
+        "z_order": 2,
+        "label": "Table3"
+      },
+      {
+        "type": "rectangle",
+        "position": [-2.5, -0.28],
+        "width": 1.0,
+        "height": 0.56,
+        "color": "#000000",
+        "style": "solid",
+        "alpha": 1,
+        "z_order": 2,
+        "label": "Table3"
+      },
+      {
+        "type": "rectangle",
+        "position": [-5.95, -5.95],
+        "width": 1.0,
+        "height": 0.5,
+        "color": "#000000",
+        "style": "solid",
+        "alpha": 1,
+        "z_order": 2,
+        "label": "Rack"
+      }
+    ]
   },
   "table": [
     [

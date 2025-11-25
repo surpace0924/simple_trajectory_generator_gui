@@ -14,6 +14,15 @@ from trajectory_generator.models.robot_shape import (
     RobotShape,
     get_robot_shape
 )
+from trajectory_generator.models.map_elements import (
+    MapData,
+    MapElement,
+    Rectangle,
+    Circle,
+    Polygon,
+    Line,
+    Text
+)
 
 __all__ = [
     'TrajectoryConfig',
@@ -22,4 +31,11 @@ __all__ = [
     'ViaPointValidator',
     'RobotShape',
     'get_robot_shape',
+    'MapData',
+    'MapElement',
+    'Rectangle',
+    'Circle',
+    'Polygon',
+    'Line',
+    'Text',
 ]

@@ -22,8 +22,10 @@ from PyQt5.QtWidgets import (
 from trajectory_generator.resources.trajectory_generator_ui import Ui_SimpleTrajectoryGenerator
 from trajectory_generator.gui import trajectory_viewer
 from trajectory_generator.gui import graph_viewer
+from trajectory_generator.gui.map_renderer import MapRenderer
 from trajectory_generator.core.trajectory_planner import TrajectoryPlanner
 from trajectory_generator.models.models import TrajectoryConfig, ViaPoint, TrajectoryResult
+from trajectory_generator.models.map_elements import MapData
 from trajectory_generator.exceptions import (
     InvalidViaPointError,
     InvalidConfigurationError,
@@ -84,6 +86,10 @@ class TrajectoryGeneratorGui(QMainWindow, Ui_SimpleTrajectoryGenerator):
         self.via_speed: List[float] = []  # 経由点での目標速度リスト
         self.use_via_angle: List[bool] = []  # 経由点の角度制約を使用するか
         self.use_via_speed: List[bool] = []  # 経由点の速度制約を使用するか
+
+        # マップデータとレンダラー
+        self.map_data: Optional[MapData] = None
+        self.map_renderer = MapRenderer()
 
         # 前回使用した設定ファイルのパスを保存するファイル（リポジトリ内）
         script_dir = os.path.dirname(os.path.abspath(__file__))
@@ -421,7 +427,8 @@ class TrajectoryGeneratorGui(QMainWindow, Ui_SimpleTrajectoryGenerator):
                 dot_hz=control_frequency,
                 disp_period=disp_period,
                 robot=self.app_param['robot_shape'],
-                speed_profile=self.result.velocities
+                speed_profile=self.result.velocities,
+                map_data=self.map_data
             )
             tv.display()
             self._redraw()
@@ -538,6 +545,19 @@ class TrajectoryGeneratorGui(QMainWindow, Ui_SimpleTrajectoryGenerator):
             self.label_19.setText(robot_name)
         else:
             self.label_19.setText('未設定')
+
+        # マップデータの読み込み
+        if 'map' in self.app_param:
+            try:
+                self.map_data = MapData.from_dict(self.app_param['map'])
+                self.canvas.setMapData(self.map_data, self.map_renderer)
+                self.canvas.plot()  # マップを再描画
+                self._print_log(f"[Info] マップ '{self.map_data.name}' を読み込みました")
+            except Exception as e:
+                self._print_log(f"[Warning] マップの読み込みに失敗しました: {e}")
+                self.map_data = None
+        else:
+            self.map_data = None
 
         # tableに経由点データを反映
         if 'table' in self.app_param:

@@ -1,27 +1,36 @@
-# trajectory_generator_2021
-任意の点を指定してそれを補間する経路を生成するアプリケーションです．<br>
-Python3上で動作します．<br>
-経路データはCSV形式でエクスポートされます．<br>
+# simple_trajectory_generator
 
+ロボットの経路生成を行うためのPython GUIアプリケーションです。経由点の設定、制約条件の指定、経路の生成・可視化を行います。
 
+## 必要な環境
 
-# 必要なパッケージのインストール
-pip，conda，aptなどお使いの環境に合わせてインストールしてください．
-```
-pip install pyqt5
-pip install numpy
-pip install matplotlib
+- Python 3.9以上
+- PySide6
+- NumPy
+- Matplotlib
+
+## インストール
+
+```bash
+pip install -r requirements.txt
 ```
 
-一部環境ではpyqt5がうまく入らないので，その時は
-```
-sudo apt-get install python3-pyqt5
-```
-を試してみてください．
+## 使用方法
 
-# 起動
-ディレクトリ内に入ってPythonコマンドより起動．
+```bash
+python trajectory_generator_gui.py
 ```
-cd trajectory_generator
-python3 trajectory_generator_gui.py
-```
+
+## ライセンス
+
+このプロジェクトは Apache License 2.0 の下でライセンスされています。詳細は [LICENSE](LICENSE) ファイルを参照してください。
+
+### 依存ライブラリのライセンス
+
+このプロジェクトは以下のオープンソースライブラリを使用しています：
+
+- **NumPy** - BSD License
+- **Matplotlib** - PSF License (BSD互換)
+- **PySide6** - LGPL License
+
+すべての依存ライブラリは Apache License 2.0 と互換性があります。

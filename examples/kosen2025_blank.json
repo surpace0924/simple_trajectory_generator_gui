@@ -1,0 +1,110 @@
+{
+  "max_linear_jerk": "9.0",
+  "max_linear_acceleration": "3.9",
+  "max_linear_speed": "5.2",
+  "hz": "100",
+  "precision": "0.01",
+  "disp_period": "0.25",
+  "robot_shape": {
+    "name": "TR",
+    "vertices": [
+      [
+        0.541,
+        0.062
+      ],
+      [
+        0.447,
+        0.062
+      ],
+      [
+        -0.187,
+        0.299
+      ],
+      [
+        -0.363,
+        0.299
+      ],
+      [
+        -0.363,
+        -0.299
+      ],
+      [
+        -0.187,
+        -0.299
+      ],
+      [
+        0.447,
+        -0.062
+      ],
+      [
+        0.541,
+        -0.062
+      ]
+    ]
+  },
+  "map": {
+    "name": "Kosen2025",
+    "scale": 1.0,
+    "origin": [
+      0.0,
+      0.0
+    ],
+    "background_color": "#FFFFFF",
+    "elements": [
+      {
+        "type": "line",
+        "points": [
+          [
+            0,
+            0
+          ],
+          [
+            4.2275,
+            0
+          ],
+          [
+            4.2275,
+            6.8
+          ],
+          [
+            3.6275,
+            6.8
+          ],
+          [
+            3.6275,
+            10.5
+          ],
+          [
+            0,
+            10.5
+          ],
+          [
+            0,
+            0
+          ]
+        ],
+        "width": 0.1,
+        "color": "#000000",
+        "style": "solid",
+        "alpha": 1.0,
+        "z_order": 2,
+        "label": "Field Border"
+      },
+      {
+        "type": "rectangle",
+        "position": [
+          1.0,
+          3.31
+        ],
+        "width": 0.38,
+        "height": 0.38,
+        "color": "#000000",
+        "style": "solid",
+        "alpha": 1,
+        "z_order": 2,
+        "label": "pylon"
+      }
+    ]
+  },
+  "table": []
+}

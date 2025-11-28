@@ -560,18 +560,24 @@ class TrajectoryGeneratorGui(QMainWindow, Ui_SimpleTrajectoryGenerator):
         else:
             self.label_19.setText('未設定')
 
-        # マップデータの読み込み
+        # マップデータの読み込み（キャンバスをクリアしてから描画）
+        self.canvas.clearMap()  # 既存のマップをクリア
+
         if 'map' in self.app_param:
             try:
                 self.map_data = MapData.from_dict(self.app_param['map'])
                 self.canvas.setMapData(self.map_data, self.map_renderer)
-                self.canvas.plot()  # マップを再描画
+                self.canvas.plot()  # 新しいマップを描画
                 self._print_log(f"[Info] マップ '{self.map_data.name}' を読み込みました")
             except Exception as e:
                 self._print_log(f"[Warning] マップの読み込みに失敗しました: {e}")
                 self.map_data = None
+                self.canvas.setMapData(None, None)
+                self.canvas.plot()  # デフォルトフィールドを描画
         else:
             self.map_data = None
+            self.canvas.setMapData(None, None)
+            self.canvas.plot()  # デフォルトフィールドを描画
 
         # tableに経由点データを反映
         if 'table' in self.app_param:
